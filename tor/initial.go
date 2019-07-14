@@ -109,7 +109,11 @@ again:
 		if err != nil {
 			return err
 		}
-		conn, err = dialer.Dial("tcp", s)
+		d, ok := dialer.(proxy.ContextDialer)
+		if !ok {
+			return errors.New("Dialer is not ContextDialer")
+		}
+		conn, err = d.DialContext(ctx, "tcp", s)
 	}
 	if err != nil {
 		return err
@@ -127,7 +131,7 @@ again:
 		return errors.New("bad port")
 	}
 
-	err = Client(conn, t, t.proxy, cryptoHandshake, cryptoOptions)
+	err = Client(conn, t, ip, port, t.proxy, cryptoHandshake, cryptoOptions)
 	if err == protocol.ErrBadHandshake {
 		if cryptoOptions.PreferCryptoHandshake &&
 			!cryptoOptions.ForceCryptoHandshake {
@@ -148,7 +152,7 @@ again:
 	return err
 }
 
-func Client(conn net.Conn, t *Torrent, proxy string,
+func Client(conn net.Conn, t *Torrent, ip net.IP, port int, proxy string,
 	cryptoHandshake bool, cryptoOptions *crypto.Options) error {
 
 	stats, err := t.GetStats()
@@ -170,15 +174,10 @@ func Client(conn net.Conn, t *Torrent, proxy string,
 		return err
 	}
 
-	addr, ok := conn.RemoteAddr().(*net.TCPAddr)
-	if !ok {
-		addr = nil
-	} else {
-		err = t.AddKnown(addr.IP, addr.Port, result.Id, "", known.Seen)
-		if err != nil {
-			conn.Close()
-			return err
-		}
+	err = t.AddKnown(ip, port, result.Id, "", known.Seen)
+	if err != nil {
+		conn.Close()
+		return err
 	}
 
 	if result.Id.Equals(t.MyId) {
@@ -190,13 +189,6 @@ func Client(conn net.Conn, t *Torrent, proxy string,
 	if q != nil {
 		conn.Close()
 		return ErrDuplicateConnection
-	}
-
-	var ip net.IP
-	var port int
-	if addr != nil {
-		ip = addr.IP
-		port = addr.Port
 	}
 
 	err = t.NewPeer(proxy, conn, ip, port, false, result, init)
