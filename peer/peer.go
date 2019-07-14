@@ -1144,6 +1144,10 @@ done:
 }
 
 func unchoke(peer *Peer, unchoke bool) {
+	if unchoke && !peer.interested {
+		peer.Log.Printf("Attempted to unchoke uninterested peer")
+		unchoke = false
+	}
 	if unchoke == (peer.amUnchoking != 0) {
 		return
 	}
