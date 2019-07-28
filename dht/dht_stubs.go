@@ -14,7 +14,7 @@ func Ping(ip net.IP, port uint16) error {
 	return nil
 }
 
-func Announce(id []byte, port4 uint16, port6 uint16) error {
+func Announce(id []byte, ipv6 bool, port uint16) error {
 	return nil
 }
 
