@@ -508,6 +508,7 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 			peer.amUnchoking != 0,
 			peer.amInterested,
 			isSeed(peer),
+			peer.uploadOnly,
 			peer.requests.Requested() + peer.requests.Queue(),
 			down, peer.avgDownload.Estimate(), peer.unchokeTime,
 		}

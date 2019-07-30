@@ -216,6 +216,7 @@ type PeerStatus struct {
 	AmUnchoking  bool
 	AmInterested bool
 	Seed         bool
+	UploadOnly   bool
 	Qlen         int
 	Download     float64
 	AvgDownload  float64
