@@ -217,6 +217,12 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 	peer.reqQ = 128
 	peer.time = time.Now()
 	peer.writeTime = time.Now()
+	if peer.Port > 0 {
+		writeEvent(peer, TorAddKnown{peer,
+			peer.IP, int(peer.Port), peer.Id, "",
+			known.ActiveNoReset,
+		})
+	}
 
 	if peer.canDHT && !hasProxy(peer) {
 		write(peer,
@@ -934,6 +940,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 					m.Version, kind,
 				})
 			}
+			k(peer.IP, known.ActiveNoReset)
 			k(peer.IP, known.Seen)
 			if m.IPv4 != nil {
 				k(m.IPv4, known.Heard)

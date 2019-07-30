@@ -40,6 +40,7 @@ const (
 	Heard
 	Seen
 	Active
+	ActiveNoReset
 	ConnectAttempt
 	Good
 	Bad
@@ -62,6 +63,8 @@ func (kp *Peer) Update(version string, kind Kind) {
 	case Active:
 		kp.ActiveTime = time.Now()
 		kp.Attempts = 0
+	case ActiveNoReset:
+		kp.ActiveTime = time.Now()
 	case ConnectAttempt:
 		kp.ConnectAttemptTime = time.Now()
 		kp.Attempts++
