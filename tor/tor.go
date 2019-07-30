@@ -322,6 +322,39 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		copy(available, t.available)
 		c.Ch <- available
 		close(c.Ch)
+	case peer.TorDropPeer:
+		seed := t.Pieces.Bitmap().All(t.Pieces.Num())
+		var q *peer.Peer
+		ps := t.rand.Perm(len(t.peers))
+		for _, pn := range ps {
+			p := t.peers[pn]
+			if seed {
+				s := p.GetStatus()
+				if s == nil || s.Seed || s.UploadOnly {
+					q = p
+					break
+				}
+			}
+			port := p.GetPort()
+			if port > 0 {
+				kp := known.Find(t.known, p.IP, port, nil, "",
+					known.None)
+				if kp != nil {
+					tm := time.Since(kp.ActiveTime)
+					if tm > 5*time.Minute {
+						q = p
+						break
+					}
+				}
+			}
+		}
+		if q != nil {
+			writePeer(q, peer.PeerDone{})
+			c.Ch <- true
+		} else {
+			c.Ch <- false
+		}
+		close(c.Ch)
 	case peer.TorGetPeer:
 		for _, p := range t.peers {
 			if p.Id.Equals(c.Id) {
@@ -1562,6 +1595,21 @@ func (t *Torrent) GetAvailable() (Available, error) {
 		}
 	case <-t.Done:
 		return nil, ErrTorrentDead
+	}
+}
+
+func (t *Torrent) DropPeer() (bool, error) {
+	ch := make(chan bool)
+	select {
+	case t.Event <- peer.TorDropPeer{ch}:
+		select {
+		case v := <-ch:
+			return v, nil
+		case <-t.Done:
+			return false, ErrTorrentDead
+		}
+	case <-t.Done:
+		return false, ErrTorrentDead
 	}
 }
 

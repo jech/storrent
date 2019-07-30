@@ -53,6 +53,10 @@ type TorGetAvailable struct {
 	Ch chan<- []uint16
 }
 
+type TorDropPeer struct {
+	Ch chan<- bool
+}
+
 type TorGetPeer struct {
 	Id hash.Hash
 	Ch chan<- *Peer

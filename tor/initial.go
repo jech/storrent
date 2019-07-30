@@ -58,8 +58,11 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 	}
 
 	if stats.NumPeers >= config.MaxPeersPerTorrent {
-		conn.Close()
-		return nil
+		dropped, _ := t.DropPeer()
+		if(!dropped) {
+			conn.Close()
+			return nil
+		}
 	}
 
 	q, _ := t.GetPeer(result.Id)
