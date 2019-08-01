@@ -1121,6 +1121,7 @@ func webseedGR(ctx context.Context, ws *webseed.GetRight,
 	t *Torrent, index, offset, length uint32) {
 	fcs := fileChunks(t, index, offset, length)
 	writer := NewWriter(t, index, offset, length)
+	defer writer.Close()
 	for _, fc := range fcs {
 		var n int64
 		var err error
