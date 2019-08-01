@@ -107,8 +107,6 @@ func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 				err = er
 			}
 			break
-		} else if n == 0 {
-			err = errors.New("zero-length read")
 		}
 		if ew != nil {
 			err = ew
