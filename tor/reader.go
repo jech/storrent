@@ -23,18 +23,21 @@ type reader struct {
 	length  int64
 
 	sync.Mutex
-	position  int64
-	requested []requested
-	context   context.Context
+	position       int64
+	requested      []requested
+	requestedIndex int
+	ch             <-chan struct{}
+	context        context.Context
 }
 
 func (t *Torrent) NewReader(ctx context.Context,
 	offset int64, length int64) *reader {
 	r := &reader{
-		torrent: t,
-		offset:  offset,
-		length:  length,
-		context: ctx,
+		torrent:        t,
+		offset:         offset,
+		length:         length,
+		context:        ctx,
+		requestedIndex: -1,
 	}
 	runtime.SetFinalizer(r, (*reader).Close)
 	return r
@@ -106,6 +109,13 @@ func (r *reader) chunks(pos int64, limit int64) []requested {
 }
 
 func (r *reader) request(pos int64, limit int64) (<-chan struct{}, error) {
+	if r.requestedIndex >= 0 {
+		index := uint32(pos / int64(r.torrent.Pieces.PieceSize()))
+		if r.requestedIndex == int(index) {
+			return r.ch, nil
+		}
+	}
+
 	chunks := r.chunks(pos, limit)
 	old := r.requested
 	r.requested = make([]requested, 0, len(chunks))
@@ -131,6 +141,12 @@ func (r *reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 		r.torrent.Request(c.index, c.prio, false, false)
 	}
 
+	if len(chunks) > 0 {
+		r.requestedIndex = int(chunks[0].index)
+	} else {
+		r.requestedIndex = -1
+	}
+	r.ch = done
 	return done, err
 }
 
