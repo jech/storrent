@@ -28,42 +28,45 @@ func (w *writer) writeEvent(e peer.TorEvent) {
 	}
 }
 
-func (w *writer) flush(data []byte) ([]byte, error) {
+func (w *writer) write(data []byte) (int, error) {
 	count, complete, err :=
 		w.t.Pieces.AddData(w.index, w.offset, data, ^uint32(0))
 	if count > 0 {
 		w.writeEvent(peer.TorData{nil,
 			w.index, w.offset, count, complete,
 		})
-		data = data[count:]
 		w.count -= count
 		w.offset += count
 	}
-	return data, err
+	return int(count), err
 }
+
+var ErrShortWrite = errors.New("short write")
 
 func (w *writer) Write(p []byte) (int, error) {
 	if w.t == nil {
 		return 0, errClosedWriter
 	}
-	peer.DownloadEstimator.Accumulate(len(p))
-	if w.count < uint32(len(w.buf)) {
-		return 0, io.EOF
+	max := int(w.count) - len(w.buf)
+	if max < 0 {
+		return 0, ErrShortWrite
+	}
+
+	q := p
+	if len(q) > max {
+		q = q[:max]
 	}
 
 	var data []byte
 	if len(w.buf) == 0 {
-		data = p
+		data = q
 	} else {
-		w.buf = append(w.buf, p...)
+		w.buf = append(w.buf, q...)
 		data = w.buf
 	}
 
-	if len(data) > int(w.count) {
-		data = data[:w.count]
-	}
-
-	data, err := w.flush(data)
+	n, err := w.write(data)
+	data = data[n:]
 	if cap(w.buf) < len(data) {
 		w.buf = make([]byte, len(data))
 	} else {
@@ -71,7 +74,12 @@ func (w *writer) Write(p []byte) (int, error) {
 	}
 	copy(w.buf, data)
 
-	return len(p), err
+	peer.DownloadEstimator.Accumulate(len(q))
+
+	if err == nil && len(q) < len(p) {
+		err = ErrShortWrite
+	}
+	return len(q), err
 }
 
 func (w *writer) ReadFrom(r io.Reader) (int64, error) {
@@ -98,9 +106,9 @@ func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 		n, er := r.Read(w.buf[len(w.buf):max])
 		w.buf = w.buf[:len(w.buf)+n]
 		peer.DownloadEstimator.Accumulate(n)
-		data, ew := w.flush(w.buf)
-		w.buf = w.buf[:len(data)]
-		copy(w.buf, data)
+		m, ew := w.write(w.buf)
+		copy(w.buf, w.buf[m:])
+		w.buf = w.buf[:len(w.buf) - m]
 		count += int64(n)
 		if er != nil {
 			if er != io.EOF {
