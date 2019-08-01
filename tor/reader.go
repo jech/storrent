@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"runtime"
-	"sync"
 
 	"storrent/config"
 )
@@ -22,7 +21,6 @@ type reader struct {
 	offset  int64
 	length  int64
 
-	sync.Mutex
 	position       int64
 	requested      []requested
 	requestedIndex int
@@ -44,8 +42,6 @@ func (t *Torrent) NewReader(ctx context.Context,
 }
 
 func (r *reader) Seek(o int64, whence int) (n int64, err error) {
-	r.Lock()
-	defer r.Unlock()
 	if r.torrent == nil {
 		return r.position, errClosedReader
 	}
@@ -151,8 +147,6 @@ func (r *reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 }
 
 func (r *reader) Read(a []byte) (n int, err error) {
-	r.Lock()
-	defer r.Unlock()
 	t := r.torrent
 	if t == nil {
 		err = errClosedReader
@@ -209,8 +203,6 @@ func (r *reader) Read(a []byte) (n int, err error) {
 }
 
 func (r *reader) Close() error {
-	r.Lock()
-	defer r.Unlock()
 	r.request(-1, -1)
 	r.torrent = nil
 	runtime.SetFinalizer(r, nil)
