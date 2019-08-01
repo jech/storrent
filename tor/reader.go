@@ -122,7 +122,7 @@ func (r *reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 			done = dn
 			err = e
 			if err != nil {
-				return done, err
+				break
 			}
 		}
 	}
