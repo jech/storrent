@@ -14,6 +14,7 @@ import (
 	"storrent/bitmap"
 	"storrent/config"
 	"storrent/hash"
+	"storrent/mono"
 )
 
 // ErrHashMismatch is returned by AddData when hash validation failed.
@@ -28,7 +29,7 @@ type Piece struct {
 	data   []byte
 	bitmap bitmap.Bitmap
 	state  uint32
-	time   time.Time
+	time   mono.Time
 	peers  []uint32
 }
 
@@ -180,6 +181,8 @@ func (ps *Pieces) ReadAt(p []byte, off int64) (int, error) {
 // Update sets the timestamp of a piece to a given time.  It returns true
 // if the piece is complete.
 func (ps *Pieces) Update(index uint32, when time.Time) bool {
+	wh := mono.New(when)
+
 	ps.Lock()
 	defer ps.Unlock()
 
@@ -187,8 +190,8 @@ func (ps *Pieces) Update(index uint32, when time.Time) bool {
 		return false
 	}
 
-	if ps.pieces[index].time.Before(when) {
-		ps.pieces[index].time = when
+	if ps.pieces[index].time.Before(wh) {
+		ps.pieces[index].time = wh
 	}
 	return ps.pieces[index].complete()
 }
@@ -412,11 +415,11 @@ func (ps *Pieces) Bytes() int64 {
 // Expire deletes pieces until the amount of space consumed is smaller than
 // the value given by bytes.  It calls f whenever it deletes a complete piece.
 func (ps *Pieces) Expire(bytes int64, available []uint16, f func(index uint32)) int {
-	now := time.Now()
+	now := mono.Now()
 
 	ps.RLock()
 	npieces := len(ps.pieces)
-	t := make([]time.Duration, npieces)
+	t := make([]uint32, npieces)
 	for i := range t {
 		t[i] = now.Sub(ps.pieces[i].time)
 	}
@@ -424,7 +427,7 @@ func (ps *Pieces) Expire(bytes int64, available []uint16, f func(index uint32)) 
 
 	a := rand.Perm(npieces)
 	sort.Slice(a, func(i, j int) bool {
-		if t[a[i]] >= 2*time.Hour && t[a[j]] >= 2*time.Hour {
+		if t[a[i]] >= 7200 && t[a[j]] >= 7200 {
 			// commonest first
 			var ai, aj uint16
 			if a[i] < len(available) {
