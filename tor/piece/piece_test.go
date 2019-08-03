@@ -4,7 +4,6 @@ import (
 	"io"
 	"testing"
 	"sync/atomic"
-	"time"
 
 	"storrent/alloc"
 	"storrent/hash"
@@ -284,7 +283,7 @@ func BenchmarkReadUpdate(b *testing.B) {
 		buf := make([]byte, 16384)
 		n := uint32(0)
 		for pb.Next() {
-			complete := ps.Update(n / (256 / 16), time.Now())
+			complete := ps.Update(n / (256 / 16))
 			if !complete {
 				b.Errorf("Update: %v", complete)
 			}

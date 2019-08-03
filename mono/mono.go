@@ -13,7 +13,7 @@ func init() {
 
 type Time uint32
 
-func New(tm time.Time) Time {
+func new(tm time.Time) Time {
 	d := time.Since(origin)
 	if d < time.Second || d > time.Duration(^uint32(0))*time.Second {
 		panic("time overflow")
@@ -33,7 +33,7 @@ func (t1 Time) Before(t2 Time) bool {
 }
 
 func Now() Time {
-	return New(time.Now())
+	return new(time.Now())
 }
 
 func Since(t Time) uint32 {

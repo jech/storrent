@@ -188,8 +188,8 @@ func (ps *Pieces) ReadAt(p []byte, off int64) (int, error) {
 
 // Update sets the timestamp of a piece to a given time.  It returns true
 // if the piece is complete.
-func (ps *Pieces) Update(index uint32, when time.Time) bool {
-	wh := mono.New(when)
+func (ps *Pieces) Update(index uint32) bool {
+	wh := mono.Now()
 
 	if ps.pieces[index].Time().Before(wh) {
 		ps.pieces[index].SetTime(wh)

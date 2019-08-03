@@ -1740,7 +1740,7 @@ func (t *Torrent) Request(index uint32, prio int8, request bool,
 	}
 
 	if request {
-		complete := t.Pieces.Update(index, time.Now())
+		complete := t.Pieces.Update(index)
 		if complete {
 			return false, nil, nil
 		}
