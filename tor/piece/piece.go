@@ -73,6 +73,14 @@ func (p *Piece) setState(oldstate, state uint32) {
 	}
 }
 
+func (p *Piece) Time() mono.Time {
+	return mono.LoadAtomic(&p.time)
+}
+
+func (p *Piece) SetTime(tm mono.Time) {
+	mono.StoreAtomic(&p.time, tm)
+}
+
 type Pieces struct {
 	sync.RWMutex
 	deleted bool // torrent destroyed, don't add new data
@@ -183,17 +191,11 @@ func (ps *Pieces) ReadAt(p []byte, off int64) (int, error) {
 func (ps *Pieces) Update(index uint32, when time.Time) bool {
 	wh := mono.New(when)
 
-	ps.Lock()
-	defer ps.Unlock()
-
-	if ps.deleted {
-		return false
+	if ps.pieces[index].Time().Before(wh) {
+		ps.pieces[index].SetTime(wh)
 	}
 
-	if ps.pieces[index].time.Before(wh) {
-		ps.pieces[index].time = wh
-	}
-	return ps.pieces[index].complete()
+	return ps.pieces[index].Complete()
 }
 
 func (p *Piece) addPeer(peer uint32) {
@@ -417,13 +419,11 @@ func (ps *Pieces) Bytes() int64 {
 func (ps *Pieces) Expire(bytes int64, available []uint16, f func(index uint32)) int {
 	now := mono.Now()
 
-	ps.RLock()
 	npieces := len(ps.pieces)
 	t := make([]uint32, npieces)
 	for i := range t {
-		t[i] = now.Sub(ps.pieces[i].time)
+		t[i] = now.Sub(ps.pieces[i].Time())
 	}
-	ps.RUnlock()
 
 	a := rand.Perm(npieces)
 	sort.Slice(a, func(i, j int) bool {
