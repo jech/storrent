@@ -151,6 +151,10 @@ func TestPieces(t *testing.T) {
 		t.Errorf("Bytes: %v", b)
 	}
 
+	ps.Del()
+	if bytes := alloc.Bytes(); bytes != 0 {
+		t.Errorf("%v bytes allocated", bytes)
+	}
 }
 
 func BenchmarkAddDel(b *testing.B) {
@@ -177,6 +181,11 @@ func BenchmarkAddDel(b *testing.B) {
 			}
 		}
 	})
+
+	ps.Del()
+	if bytes := alloc.Bytes(); bytes != 0 {
+		b.Errorf("%v bytes allocated", bytes)
+	}
 }
 
 func BenchmarkAddFinalise(b *testing.B) {
@@ -255,6 +264,11 @@ func BenchmarkRead(b *testing.B) {
 			n = (n + 1) % chunks
 		}
 	})
+
+	ps.Del()
+	if bytes := alloc.Bytes(); bytes != 0 {
+		b.Errorf("%v bytes allocated", bytes)
+	}
 }
 
 func BenchmarkReadUpdate(b *testing.B) {
@@ -281,5 +295,10 @@ func BenchmarkReadUpdate(b *testing.B) {
 			n = (n + 1) % chunks
 		}
 	})
+
+	ps.Del()
+	if bytes := alloc.Bytes(); bytes != 0 {
+		b.Errorf("%v bytes allocated", bytes)
+	}
 }
 
