@@ -204,9 +204,14 @@ func BenchmarkAddFinalise(b *testing.B) {
 			}
 		}
 	})
+
+	ps.Del()
+	if bytes := alloc.Bytes(); bytes != 0 {
+		b.Errorf("%v bytes allocated", bytes)
+	}
 }
 
-func prepare2(chunks uint32) (*Pieces, error) {
+func prepare(chunks uint32) (*Pieces, error) {
 	ps := &Pieces{}
 	chunk := make([]byte, 16 * 1024)
 	ps.Complete(256*1024, int64(chunks) * 16 * 1024)
@@ -232,7 +237,7 @@ func prepare2(chunks uint32) (*Pieces, error) {
 
 func BenchmarkRead(b *testing.B) {
 	chunks := uint32(4096)
-	ps, err := prepare2(chunks)
+	ps, err := prepare(chunks)
 	if err != nil {
 		b.Fatalf("Prepare: %v", err)
 	}
@@ -254,7 +259,7 @@ func BenchmarkRead(b *testing.B) {
 
 func BenchmarkReadUpdate(b *testing.B) {
 	chunks := uint32(4096)
-	ps, err := prepare2(chunks)
+	ps, err := prepare(chunks)
 	if err != nil {
 		b.Fatalf("Prepare: %v", err)
 	}
