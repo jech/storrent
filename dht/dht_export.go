@@ -5,6 +5,7 @@ package dht
 import (
 	crand "crypto/rand"
 	"crypto/sha1"
+	"errors"
 	"net"
 	"os"
 	"syscall"
@@ -100,13 +101,13 @@ func dht_send_callback(buf unsafe.Pointer, size C.size_t,
 		n, err = conn.WriteToUDP(data, &addr)
 	}
 	if err != nil {
-		e := syscall.EIO
-		if os.IsTimeout(err) {
-			e = syscall.EAGAIN
-		} else if osscerr, ok := err.(*os.SyscallError); ok {
-			e = osscerr.Err.(syscall.Errno)
-		} else if scerr, ok := err.(syscall.Errno); ok {
-			e = scerr
+		var e syscall.Errno
+		if !errors.As(err, &e) {
+			if os.IsTimeout(err) {
+				e = syscall.EAGAIN
+			} else {
+				e = syscall.EIO
+			}
 		}
 		C.dht_set_errno(C.int(e))
 		return -1
