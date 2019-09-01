@@ -10,8 +10,6 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 /*
@@ -93,7 +91,7 @@ func dht_send_callback(buf unsafe.Pointer, size C.size_t,
 	addr.Port = int(port)
 	conn = getConn(addr.IP.To4() == nil)
 	if conn == nil {
-		C.dht_set_errno(C.int(unix.EAFNOSUPPORT))
+		C.dht_set_errno(C.int(syscall.EAFNOSUPPORT))
 		return -1
 	}
 	err := conn.SetWriteDeadline(time.Now().Add(time.Second))
@@ -102,9 +100,9 @@ func dht_send_callback(buf unsafe.Pointer, size C.size_t,
 		n, err = conn.WriteToUDP(data, &addr)
 	}
 	if err != nil {
-		e := unix.EIO
+		e := syscall.EIO
 		if os.IsTimeout(err) {
-			e = unix.EAGAIN
+			e = syscall.EAGAIN
 		} else if osscerr, ok := err.(*os.SyscallError); ok {
 			e = osscerr.Err.(syscall.Errno)
 		} else if scerr, ok := err.(syscall.Errno); ok {
