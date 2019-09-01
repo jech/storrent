@@ -321,6 +321,7 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 
 	for {
 		if time.Since(addrTime) > 2*time.Minute {
+			addrTime = time.Now()
 			newaddr := net.UDPAddr{Port: int(port)}
 			if ipv6 {
 				ip := getIPv6()
@@ -337,13 +338,19 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 				if ipv6 {
 					f = "udp6"
 				}
+				mu.Lock()
+				setConn(ipv6, nil)
+				mu.Unlock()
+				addr = net.UDPAddr{}
+				conn = nil
+
 				c, err := net.ListenUDP(f, &newaddr)
 				if err != nil {
 					log.Printf("ListenUDP: %v", err)
 					time.Sleep(time.Minute)
 					continue
 				}
-				addrTime = time.Now()
+
 				mu.Lock()
 				setConn(ipv6, c)
 				mu.Unlock()
