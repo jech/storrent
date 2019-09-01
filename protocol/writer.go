@@ -255,18 +255,9 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 }
 
 func Writer(conn net.Conn, l *log.Logger, ch <-chan Message, done chan<- struct{}) error {
+	defer close(done)
 
 	w := bufio.NewWriter(conn)
-
-	defer func() {
-		close(done)
-		for {
-			_, ok := <-ch
-			if !ok {
-				break
-			}
-		}
-	}()
 
 	write := func(m Message) error {
 		err := conn.SetWriteDeadline(time.Now().Add(4 * time.Second))
