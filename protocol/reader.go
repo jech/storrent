@@ -375,29 +375,19 @@ func Reader(c net.Conn, init []byte, l *log.Logger, ch chan<- Message, done <-ch
 		r = bufio.NewReader(io.MultiReader(bytes.NewReader(init), c))
 	}
 	for {
+		var m Message
+		err := c.SetReadDeadline(
+			time.Now().Add(6 * time.Minute))
+		if err == nil {
+			m, err = Read(r, l)
+		}
+		if err != nil {
+			m = Error{err}
+		}
 		select {
+		case ch <- m:
 		case <-done:
 			return
-		default:
-			var m Message
-			err := c.SetReadDeadline(
-				time.Now().Add(6 * time.Minute))
-			if err == nil {
-				m, err = Read(r, l)
-			}
-			if err != nil {
-				select {
-				case ch <- Error{err}:
-					return
-				case <-done:
-					return
-				}
-			}
-			select {
-			case ch <- m:
-			case <-done:
-				return
-			}
 		}
 	}
 }
