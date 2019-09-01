@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"time"
 	"unsafe"
@@ -355,7 +356,7 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 		timedout := false
 		n, from, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			if err, ok := err.(net.Error); ok && err.Timeout() {
+			if os.IsTimeout(err) {
 				timedout = true
 			} else {
 				log.Printf("DHT: %v", err)
@@ -380,7 +381,9 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 		} else {
 			buf[n] = 0
 			ip := from.IP
-			if !ipv6 {
+			if ipv6 {
+				ip = ip.To16()
+			} else {
 				ip = ip.To4()
 			}
 			if ip == nil {
