@@ -16,26 +16,20 @@ type GetRight struct {
 	base
 }
 
+type FileError struct {
+	file []string
+	err  error
+}
+
+func (err FileError) Error() string {
+	return fmt.Sprintf("%v (%v)", err.err, strings.Join(err.file, "/"))
+}
+
+func (err FileError) Unwrap() error {
+	return err.err
+}
+
 var ErrParse = errors.New("parse error")
-
-type ErrRange struct {
-	url string
-}
-
-func (err ErrRange) Error() string {
-	return fmt.Sprintf("server didn't honour range request (%v)", err.url)
-}
-
-type ErrMismatch struct {
-	url      string
-	got      int64
-	expected int64
-}
-
-func (err ErrMismatch) Error() string {
-	return fmt.Sprintf("size mismatch (%v, got %d, expected %d)",
-		err.url, err.got, err.expected)
-}
 
 func parseContentRange(cr string) (offset int64, length int64, fl int64,
 	err error) {
@@ -101,6 +95,11 @@ func buildUrl(url string, name string, file []string) string {
 func (ws *GetRight) Get(ctx context.Context, proxy string,
 	name string, file []string, flength, offset, length int64,
 	w io.Writer) (int64, error) {
+
+	errorf := func(format string, args... interface{}) error {
+		return FileError{file, fmt.Errorf(format, args...)}
+	}
+
 	ws.start()
 	defer ws.stop()
 
@@ -132,14 +131,15 @@ func (ws *GetRight) Get(ctx context.Context, proxy string,
 	if r.StatusCode == http.StatusOK {
 		if offset != 0 {
 			ws.error(true)
-			return 0, ErrRange{strings.Join(file, "/")}
+			return 0, errorf("server ignored range request")
 		}
 		cl := r.Header.Get("Content-Length")
 		if cl != "" {
 			var err error
 			fl, err = strconv.ParseInt(cl, 10, 64)
 			if err != nil {
-				return 0, err
+				ws.error(true)
+				return 0, FileError{file, err}
 			}
 			l = fl
 		}
@@ -147,35 +147,34 @@ func (ws *GetRight) Get(ctx context.Context, proxy string,
 		rng := r.Header.Get("Content-Range")
 		if rng == "" {
 			ws.error(true)
-			return 0, errors.New("206 with no Content-Range")
+			return 0, errorf("missing Content-Range")
 		}
 		var o int64
 		o, l, fl, err = parseContentRange(rng)
 		if err != nil {
 			ws.error(true)
-			return 0, err
+			return 0, FileError{file, err}
 		}
 		if o != offset {
 			ws.error(true)
-			return 0, ErrRange{strings.Join(file, "/")}
+			return 0, errorf("server didn't honour range request")
 		}
 	} else if r.StatusCode == http.StatusRequestedRangeNotSatisfiable {
-		var err error
 		rng := r.Header.Get("Content-Range")
 		if rng != "" {
-			_, _, fl, err2 := parseContentRange(rng)
-			if err2 == nil {
-				err = ErrMismatch{url, fl, flength}
+			_, _, fl, err := parseContentRange(rng)
+			if err == nil {
+				ws.error(true)
+				return 0, errorf("range mismatch " +
+					"(expected %v, got %v)",
+					flength, fl)
 			}
 		}
-		if err == nil {
-			err = errors.New(r.Status)
-		}
 		ws.error(true)
-		return 0, err
+		return 0, FileError{file, errors.New(r.Status)}
 	} else {
 		ws.error(true)
-		return 0, errors.New(r.Status)
+		return 0, FileError{file, errors.New(r.Status)}
 	}
 
 	if l < 0 {
@@ -185,7 +184,9 @@ func (ws *GetRight) Get(ctx context.Context, proxy string,
 	if fl >= 0 {
 		if fl != flength {
 			ws.error(true)
-			return 0, ErrMismatch{url, fl, flength}
+			return 0, errorf("range mismatch " +
+				"(expected %v, got %v)",
+				flength, fl)
 		}
 	}
 
