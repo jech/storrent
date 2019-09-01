@@ -135,7 +135,7 @@ again:
 	}
 
 	err = Client(conn, t, ip, port, t.proxy, cryptoHandshake, cryptoOptions)
-	if err == protocol.ErrBadHandshake {
+	if errors.Is(err, protocol.ErrBadHandshake) {
 		if cryptoOptions.PreferCryptoHandshake &&
 			!cryptoOptions.ForceCryptoHandshake {
 			if cryptoHandshake {

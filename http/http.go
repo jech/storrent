@@ -189,7 +189,7 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		err := t.Kill(r.Context())
 		if err != nil {
-			if err == tor.ErrTorrentDead {
+			if errors.Is(err, tor.ErrTorrentDead) {
 				http.NotFound(w, r)
 			} else {
 				http.Error(w, err.Error(),
@@ -532,7 +532,7 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 func peers(w http.ResponseWriter, r *http.Request, t *tor.Torrent) {
 	ps, err := t.GetPeers()
 	if err != nil {
-		if err == tor.ErrTorrentDead {
+		if errors.Is(err, tor.ErrTorrentDead) {
 			http.NotFound(w, r)
 		} else {
 			http.Error(w, err.Error(),
@@ -543,7 +543,7 @@ func peers(w http.ResponseWriter, r *http.Request, t *tor.Torrent) {
 
 	kps, err := t.GetKnowns()
 	if err != nil {
-		if err == tor.ErrTorrentDead {
+		if errors.Is(err, tor.ErrTorrentDead) {
 			http.NotFound(w, r)
 		} else {
 			http.Error(w, err.Error(),

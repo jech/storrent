@@ -620,7 +620,7 @@ func finalisePiece(t *Torrent, index uint32) {
 			t.Have(index, true)
 			t.BadPeers(peers, false)
 		}
-		if err == piece.ErrHashMismatch {
+		if errors.Is(err, piece.ErrHashMismatch) {
 			t.Log.Printf("Hash mismatch")
 			t.BadPeers(peers, true)
 		} else if err != nil {
