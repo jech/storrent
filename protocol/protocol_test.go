@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	crand "crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,11 +19,6 @@ import (
 	"storrent/hash"
 	"storrent/pex"
 )
-
-type mtest struct {
-	m Message
-	v string
-}
 
 func randomHash() hash.Hash {
 	h := make([]byte, 20)
@@ -64,6 +60,11 @@ func TestHandshake(t *testing.T) {
 
 func TestCryptoHandshake(t *testing.T) {
 	testHandshake(t, true, &crypto.Options{AllowCryptoHandshake: true})
+}
+
+type mtest struct {
+	m Message
+	v string
 }
 
 var messages = []mtest{
@@ -112,6 +113,22 @@ var messages = []mtest{
 		pex.Peer{IP: net.ParseIP("2001::1"), Port: 5678},
 		pex.Peer{IP: net.ParseIP("2001::2"), Port: 2345}}}, ""},
 	mtest{ExtendedDontHave{ExtDontHave, 1}, ""},
+}
+
+type ftest struct {
+	v string
+	e error
+}
+
+var failedMessages = []ftest{
+	ftest{"", io.EOF},
+	ftest{"\x00\x00", io.EOF},
+	ftest{"\x00\x00\x00\x01", io.EOF},
+	ftest{"\x00\x00\x00\x02\x00", ErrParse},
+	ftest{"\x00\x00\x00\x22\x14\x02" + "d5:piecei2e10:total_sizei65536ee",
+		ErrParse},
+	ftest{"\x00\x00\x00\x25\x14\x02" + "d8:msg_typei1e10:total_sizei65536ee",
+		ErrParse},
 }
 
 func TestWriter(t *testing.T) {
@@ -173,6 +190,21 @@ func TestReader(t *testing.T) {
 			}
 			if !reflect.DeepEqual(mm, m.m) {
 				t.Errorf("Got %#v, expected %#v", mm, m.m)
+			}
+		})
+	}
+}
+
+func TestReaderFail(t *testing.T) {
+	for _, m := range failedMessages {
+		t.Run(fmt.Sprintf("%v", m.v), func(t *testing.T) {
+			r := bufio.NewReader(bytes.NewReader([]byte(m.v)))
+			_, err := Read(r, nil)
+			if testing.Verbose() {
+				fmt.Printf("%v -> %v\n", m.v, err)
+			}
+			if !errors.Is(err, m.e) {
+				t.Errorf("Got %v, expected %v", err, m.e)
 			}
 		})
 	}
