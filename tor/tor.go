@@ -829,14 +829,10 @@ func maybeRequest(ctx context.Context, t *Torrent) {
 		}
 	}
 
-	min := numChunks(t, peer.DownloadEstimator.Estimate())
+	min := numChunks(t, peer.DownloadEstimator.Estimate() * 1.2)
 	max := math.MaxInt32
 	if reqrate >= 0 {
 		max = numChunks(t, reqrate)
-	}
-	prefetch := numChunks(t, config.PrefetchRate)
-	if min > prefetch {
-		min = prefetch
 	}
 	if min > max {
 		min = max
