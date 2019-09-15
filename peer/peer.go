@@ -1000,19 +1000,21 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			if offset+l > len(peer.Info) {
 				l = len(peer.Info) - offset
 			}
-			if l <= 0 {
-				maybeWrite(peer, protocol.ExtendedMetadata{
+			var err error
+			if l > 0 {
+				err = maybeWrite(peer, protocol.ExtendedMetadata{
+					uint8(peer.metadataExt), 1,
+					m.Piece, uint32(len(peer.Info)),
+					peer.Info[offset : offset+l]})
+				if err == nil {
+					peer.upload.Accumulate(l)
+					UploadEstimator.Accumulate(l)
+				}
+			}
+			if l <= 0 || err != nil {
+				write(peer, protocol.ExtendedMetadata{
 					uint8(peer.metadataExt), 2,
 					m.Piece, 0, nil})
-				return nil
-			}
-			err := maybeWrite(peer, protocol.ExtendedMetadata{
-				uint8(peer.metadataExt), 1,
-				m.Piece, uint32(len(peer.Info)),
-				peer.Info[offset : offset+l]})
-			if err == nil {
-				peer.upload.Accumulate(l)
-				UploadEstimator.Accumulate(l)
 			}
 		} else if m.Type == 1 {
 			peer.download.Accumulate(len(m.Data))
