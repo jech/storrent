@@ -1340,8 +1340,7 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 	})
 
 	count := 0
-	for i := 0; i < len(peers); i++ {
-		kp := peers[i]
+	for _, kp := range peers {
 		if !kp.Recent() || kp.Bad() {
 			continue
 		}
@@ -1357,7 +1356,7 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 			continue
 		}
 		kp.Update("", known.ConnectAttempt)
-		go func() {
+		go func(kp *known.Peer) {
 			delay := time.Duration(
 				rand.Int63n(int64(3 * time.Second)))
 			timer := time.NewTimer(delay)
@@ -1372,7 +1371,7 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 			if err != nil {
 				t.Log.Printf("Client: %v", err)
 			}
-		}()
+		}(kp)
 		count++
 		if len(t.peers)+count >= max {
 			break
