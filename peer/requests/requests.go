@@ -207,8 +207,8 @@ func (rs *Requests) ExpireRequests(t0, t1 time.Time,
 			dropped = true
 			// don't increment i
 			continue
-		} else if !r.Cancelled() && r.ctime.Before(t1) {
-			r.Cancel()
+		} else if !r.Cancelled() && r.rtime.Before(t0) {
+			rs.requested[i].Cancel()
 			cancel(r.index)
 		}
 		i++
