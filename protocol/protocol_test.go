@@ -87,8 +87,13 @@ var messages = []mtest{
 	mtest{Extended0{"toto", 1234, 256,
 		net.ParseIP("1.2.3.4").To4(), net.ParseIP("2001::1"), 1024,
 		map[string]uint8{"ut_pex": ExtPex}, false, true}, ""},
+	mtest{ExtendedMetadata{ExtMetadata, 0, 2, 64 * 1024,
+		nil}, "\x00\x00\x00/\x14\x02" +
+		"d8:msg_typei0e5:piecei2e10:total_sizei65536ee"},
 	mtest{ExtendedMetadata{ExtMetadata, 1, 2, 64 * 1024,
-		make([]byte, 16384)}, ""},
+		make([]byte, 10)}, "\x00\x00\x009\x14\x02" +
+		"d8:msg_typei1e5:piecei2e10:total_sizei65536ee" +
+		string(make([]byte, 10))},
 	mtest{ExtendedPex{ExtPex, []pex.Peer{
 		pex.Peer{IP: net.ParseIP("1.2.3.4").To4(), Port: 1234,
 			Flags: pex.Encrypt | pex.Outgoing},
@@ -253,4 +258,3 @@ func BenchmarkRequest(b *testing.B) {
 func BenchmarkData(b *testing.B) {
 	benchmarkMessage(Piece{42, 32768, make([]byte, 16384)}, 16384, b)
 }
-
