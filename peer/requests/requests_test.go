@@ -2,6 +2,7 @@ package requests
 
 import (
 	"testing"
+	"time"
 
 	"storrent/bitmap"
 )
@@ -144,6 +145,55 @@ func TestRequest(t *testing.T) {
 		check(&rs, t)
 		if !rsequal(rs, a) {
 			t.Errorf("Request failed, expected %v, got %v", a, rs)
+		}
+	}
+}
+
+func TestExpire(t *testing.T) {
+	now := time.Now()
+	ta := now.Add(-180 * time.Second)
+	tb := now.Add(-30 * time.Second)
+	tc := now.Add(-15 * time.Second)
+	td := now.Add(-5 * time.Second)
+	rs := Requests{
+		queue: nil,
+		requested: []Request{
+			Request{index: 0, qtime: ta, rtime: ta},
+			Request{index: 1, qtime: ta, rtime: tc},
+			Request{index: 2, qtime: ta, rtime: ta, ctime: now},
+			Request{index: 3, qtime: ta, rtime: tc, ctime: now},
+			Request{index: 4, qtime: ta, rtime: tc, ctime: tc},
+		},
+	}
+	for _, r := range rs.requested {
+		rs.bitmap.Set(int(r.index))
+	}
+
+	dropped := 0
+	canceled := 0
+	rs.Expire(tb, td,
+		func(index uint32) { dropped++ },
+		func(index uint32) { canceled++ },
+	)
+	if dropped != 1 {
+		t.Errorf("Dropped is %v", dropped)
+	}
+	if canceled != 1 {
+		t.Errorf("Canceled is %v", canceled)
+	}
+
+	if len(rs.requested) != 4 {
+		t.Errorf("len(requested) is %v", len(rs.requested))
+	}
+
+	for i, r := range rs.requested {
+		if r.index != uint32(i) {
+			t.Errorf("requested[%v].index is %v",
+				i, r.index)
+		}
+		if r.Cancelled() != (i != 1) {
+			t.Errorf("Cancelled %v for %v",
+				r.Cancelled(), i)
 		}
 	}
 }
