@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	crand "crypto/rand"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -191,7 +192,10 @@ func main() {
 			if t == nil {
 				t, err = tor.GetTorrent(ctx, proxy, arg)
 				if err != nil {
-					log.Fatal(err)
+					var perr tor.ErrParseURL
+					if !errors.As(err, &perr) {
+						log.Fatal(err)
+					}
 				}
 			}
 			if t == nil {
@@ -201,7 +205,7 @@ func main() {
 				}
 				t, err = tor.ReadTorrent(proxy, torfile)
 				if err != nil {
-					log.Fatalf("%v: %v\n", torfile, err)
+					log.Fatalf("%v: %v\n", arg, err)
 				}
 				torfile.Close()
 			}

@@ -162,9 +162,6 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		t, err := getTorrent(r.Context(), data)
 		if t == nil || err != nil {
-			if err == nil {
-				err = errors.New("couldn't parse torrent")
-			}
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}

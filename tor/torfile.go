@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"errors"
+	"fmt"
 	"github.com/zeebo/bencode"
 	"io"
 	"net/http"
@@ -74,11 +75,38 @@ func webseedList(urls []string, getright bool) []webseed.Webseed {
 	return l
 }
 
+type ErrUnknownScheme struct {
+	Scheme string
+}
+
+func (e ErrUnknownScheme) Error() string {
+	if e.Scheme == "" {
+		return "missing scheme"
+	}
+	return fmt.Sprintf("unknown scheme %v", e.Scheme)
+}
+
+type ErrParseURL struct {
+	Err error
+}
+
+func (e ErrParseURL) Error() string {
+	return e.Err.Error()
+}
+
+func (e ErrParseURL) Unwrap() error {
+	return e.Err
+}
+
 func GetTorrent(ctx context.Context, proxy string, url string) (*Torrent, error) {
 	u, err := nurl.Parse(url)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, nil
+	if err == nil && u.Scheme != "http" && u.Scheme != "https" {
+		err = ErrUnknownScheme{u.Scheme}
 	}
+	if err != nil {
+		return nil, ErrParseURL{err}
+	}
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
