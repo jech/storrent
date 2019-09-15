@@ -410,7 +410,7 @@ func expireRequests(peer *Peer) bool {
 	}
 	t1 := time.Now().Add(-to)
 
-	dropped := peer.requests.ExpireRequests(
+	dropped := peer.requests.Expire(
 		t0, t1,
 		func(index uint32) {
 			drop(peer, index)

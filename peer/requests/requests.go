@@ -189,7 +189,7 @@ func (rs *Requests) Clear(both bool, f func(uint32)) {
 	}
 }
 
-func (rs *Requests) ExpireRequests(t0, t1 time.Time,
+func (rs *Requests) Expire(t0, t1 time.Time,
 	drop func(index uint32),
 	cancel func(index uint32)) bool {
 
