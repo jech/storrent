@@ -713,24 +713,17 @@ type chunk struct {
 }
 
 func getChunks(t *Torrent, prio int8, max int) ([]chunk, []uint32) {
-	add := func(l []uint32, x uint32) []uint32 {
-		for _, y := range l {
-			if x == y {
-				return l
-			}
-		}
-		return append(l, x)
-	}
 	cpp := t.Pieces.PieceSize() / config.ChunkSize
 	var chunks []chunk
 	var unavailable []uint32
 	maxIF := maxInFlight(prio)
+outer:
 	for index, r := range t.requested.pieces {
 		if !hasPriority(r, prio) || t.Pieces.PieceComplete(index) {
 			continue
 		}
 		if available(t, index) <= 0 {
-			unavailable = add(unavailable, index)
+			unavailable = append(unavailable, index)
 			continue
 		}
 		n, bitmap := t.Pieces.PieceBitmap(index)
@@ -747,7 +740,7 @@ func getChunks(t *Torrent, prio int8, max int) ([]chunk, []uint32) {
 			if !bitmap.Get(i) {
 				chunks = append(chunks, chunk{ch, prio})
 				if max >= 0 && len(chunks) >= max {
-					return chunks, unavailable
+					break outer
 				}
 			}
 		}
