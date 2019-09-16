@@ -167,7 +167,6 @@ func (t *Torrent) run(ctx context.Context) {
 		return time.Duration(t.rand.Int63n(int64(time.Second)))
 	}
 	ticker := time.NewTicker(5*time.Second + jiffy())
-	t.setRequestInterval(slowInterval)
 	slowTicker := time.NewTicker(20*time.Second + jiffy())
 	ctx, cancelCtx := context.WithCancel(ctx)
 	defer func() {
@@ -193,7 +192,7 @@ func (t *Torrent) run(ctx context.Context) {
 				return
 			}
 		case <-requestChan:
-			maybeRequest(ctx, t)
+			periodicRequest(ctx, t)
 		case <-ticker.C:
 			maybeConnect(ctx, t)
 			if t.infoComplete == 0 {
@@ -456,11 +455,14 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 			}
 			return nil
 		}
-		ch := requestPiece(t, c.Index, c.Priority, c.Request,
+		ch, added := requestPiece(t, c.Index, c.Priority, c.Request,
 			c.Ch != nil)
 		if c.Ch != nil {
 			c.Ch <- ch
 			close(c.Ch)
+		}
+		if added {
+			maybeRequest(ctx, t)
 		}
 	case peer.TorMetaData:
 		if t.infoComplete != 0 {
@@ -477,7 +479,7 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 			return nil
 		}
 		writePeers(t, peer.PeerMetadataComplete{t.Info}, nil)
-		maybeRequest(ctx, t)
+		periodicRequest(ctx, t)
 	case peer.TorPeerBitmap:
 		c.Bitmap.Range(func(i int) bool {
 			noteAvailable(t, uint32(i), c.Have)
@@ -588,7 +590,10 @@ func delPeer(t *Torrent, p *peer.Peer) bool {
 }
 
 func (t *Torrent) setRequestInterval(interval time.Duration) {
-	if interval == t.requestInterval {
+	if interval == t.requestInterval ||
+		(interval > 0 &&
+			t.requestInterval > interval-interval/8 &&
+			t.requestInterval < interval+interval/8) {
 		return
 	}
 
@@ -607,6 +612,9 @@ func (t *Torrent) setRequestInterval(interval time.Duration) {
 	t.requestInterval = interval
 	t.requestSeconds = float64(interval) / float64(time.Second)
 }
+
+const fastInterval = 250 * time.Millisecond
+const slowInterval = 2 * time.Second
 
 func finalisePiece(t *Torrent, index uint32) {
 	if index >= uint32(len(t.PieceHashes)) {
@@ -643,32 +651,28 @@ func notInterested(t *Torrent) {
 	}
 }
 
-func requestPiece(t *Torrent,
-	index uint32, prio int8, request bool, want bool) <-chan struct{} {
+func requestPiece(t *Torrent, index uint32, prio int8, request bool, want bool) (<-chan struct{}, bool) {
 	if index > uint32(len(t.PieceHashes)) {
-		return nil
+		return nil, false
 	}
 
 	t.requested.time = time.Now()
 
 	var done <-chan struct{}
+	added := false
 	if request {
 		if t.Pieces.PieceComplete(index) {
 			want = false
 		}
-		var added bool
 		done, added = t.requested.Add(index, prio, want)
 		maybeInterested(t)
-		if added {
-			t.setRequestInterval(fastInterval)
-		}
 	} else {
 		removed := t.requested.Del(index, prio)
 		if removed && t.requested.pieces[index] == nil {
 			writePeers(t, peer.PeerCancelPiece{index}, nil)
 		}
 	}
-	return done
+	return done, added
 }
 
 func noteAvailable(t *Torrent, index uint32, have bool) {
@@ -749,11 +753,8 @@ outer:
 }
 
 func numChunks(t *Torrent, rate float64) int {
-	return int(rate*t.requestSeconds*(1/float64(config.ChunkSize)) + 1)
+	return int(rate*t.requestSeconds*(1/float64(config.ChunkSize)) + 0.5)
 }
-
-const fastInterval = 250 * time.Millisecond
-const slowInterval = 3 * time.Second
 
 func request(t *Torrent, p *peer.Peer, indices []uint32) error {
 	err := maybeWritePeer(p, peer.PeerRequest{indices})
@@ -778,6 +779,13 @@ func maxInFlight(prio int8) uint8 {
 const fastPieces = 8
 
 func maybeRequest(ctx context.Context, t *Torrent) {
+	prio := pickPriority(t)
+	if prio > IdlePriority {
+		periodicRequest(ctx, t)
+	}
+}
+
+func periodicRequest(ctx context.Context, t *Torrent) {
 	if t.infoComplete == 0 {
 		t.setRequestInterval(0)
 		return
@@ -785,37 +793,28 @@ func maybeRequest(ctx context.Context, t *Torrent) {
 
 	prio := pickPriority(t)
 
-	reqrate := float64(-1)
-	maxrate := float64(-1)
-	if prio == int8(math.MinInt8) {
-		idle := config.IdleRate()
-		reqrate = 2 * idle
-		maxrate = idle
-	} else if prio <= 0 {
-		reqrate = config.PrefetchRate
-		// but don't throttle
-	}
-
-	allow := func(value int) bool {
-		if maxrate < 0 {
-			return true
-		}
-		return peer.DownloadEstimator.Allow(value, maxrate)
-	}
-
-	if !allow(int(config.ChunkSize)) {
-		t.setRequestInterval(fastInterval)
-		return
-	}
-
-	cpp := t.Pieces.PieceSize() / config.ChunkSize
+	var rate float64
 
 	if prio > IdlePriority {
-		// reselect next time we're idle
 		t.requested.DelIdle()
 		t.requested.time = time.Now()
+		if prio > 0 {
+			rate = peer.DownloadEstimator.Estimate() * 1.5
+		}
+		if rate < config.PrefetchRate {
+			rate = config.PrefetchRate
+		}
 	} else {
-		rate := config.IdleRate()
+		irate := config.IdleRate()
+		if irate == 0 {
+			t.setRequestInterval(0)
+			return
+		}
+		rate = 2*irate - peer.DownloadEstimator.Estimate()
+		if rate <= 0 {
+			t.setRequestInterval(slowInterval)
+			return
+		}
 		count := int(rate*60/float64(t.Pieces.PieceSize()) + 0.5)
 		if count < 2 {
 			count = 2
@@ -829,19 +828,28 @@ func maybeRequest(ctx context.Context, t *Torrent) {
 		}
 	}
 
-	min := numChunks(t, peer.DownloadEstimator.Estimate() * 1.2)
-	max := math.MaxInt32
-	if reqrate >= 0 {
-		max = numChunks(t, reqrate)
+	interval := time.Duration(float64(2*config.ChunkSize) / rate *
+		float64(time.Second))
+	if interval < fastInterval {
+		interval = fastInterval
 	}
-	if min > max {
-		min = max
+	if interval > slowInterval {
+		interval = slowInterval
 	}
-	chunks, unavailable := getChunks(t, prio, -1) // full list, not just max
+	t.setRequestInterval(interval)
+
+	cpp := t.Pieces.PieceSize() / config.ChunkSize
+
+	count := numChunks(t, rate)
+	if count < 2 {
+		count = 2
+	}
+
+	chunks, unavailable := getChunks(t, prio, -1) // full list
 	if prio > IdlePriority {
 		q := prio - 1
-		for len(chunks) < min && q >= -1 {
-			more, umore := getChunks(t, q, min-len(chunks))
+		for len(chunks) < count && q >= -1 {
+			more, umore := getChunks(t, q, count-len(chunks))
 			chunks = append(chunks, more...)
 			unavailable = append(unavailable, umore...)
 			q--
@@ -866,14 +874,16 @@ func maybeRequest(ctx context.Context, t *Torrent) {
 		return
 	}
 
-	t.setRequestInterval(fastInterval)
-
 	sort.SliceStable(chunks, func(i, j int) bool {
 		fi := inFlight(t, chunks[i].index)
 		fj := inFlight(t, chunks[j].index)
 		return fi < fj
 	})
-	count := 0
+
+	if len(chunks) > count {
+		chunks = chunks[:count]
+	}
+
 	pcount := t.Pieces.Count()
 	delay := 1
 
@@ -881,9 +891,6 @@ outer:
 	for pass := 0; pass < 4; pass++ {
 		ps := t.rand.Perm(len(t.peers))
 		for _, pn := range ps {
-			if !allow((count + 1) * int(config.ChunkSize)) {
-				break
-			}
 			p := t.peers[pn]
 			var fast []uint32
 			if !p.Unchoked() {
@@ -914,44 +921,39 @@ outer:
 					continue
 				}
 			}
-			indices := make([]uint32, 0)
+			req := make([]chunk, 0)
 			cn := 0
-			for cn < len(chunks) {
+			for cn < len(chunks) && len(req) < cmax {
 				c := chunks[cn]
 				p := c.index / cpp
-				n := len(indices)
-				if n >= cmax || count+n >= max {
-					break
-				}
-				if !allow((count + n + 1) *
-					int(config.ChunkSize)) {
-					break
-				}
 				if inFlight(t, c.index) < maxInFlight(c.prio) &&
 					(stats.Unchoked || isFast(p, fast)) &&
 					(stats.Seed || pbitmap.Get(int(p))) {
-					indices = append(indices, c.index)
+					req = append(req, c)
 					chunks = append(chunks[:cn],
 						chunks[cn+1:]...)
 				} else {
 					cn++
 				}
 			}
-			if len(indices) > 0 {
+			if len(req) > 0 {
+				indices := make([]uint32, len(req))
+				for i, c := range req {
+					indices[i] = c.index
+				}
 				err := request(t, p, indices)
-				if err == nil {
-					count += len(indices)
+				if err != nil {
+					chunks = append(chunks, req...)
 				}
 			}
-			if count >= max || len(chunks) == 0 {
+			if len(chunks) == 0 {
 				break outer
 			}
 		}
 		delay *= 2
 	}
 
-	if !webseedDone && hasWebseeds(t) &&
-		allow((count+1)*int(config.ChunkSize)) {
+	if !webseedDone && hasWebseeds(t) {
 		sort.SliceStable(chunks, func(i, j int) bool {
 			return chunks[i].index%cpp < chunks[j].index%cpp
 		})
