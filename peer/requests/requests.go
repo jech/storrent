@@ -129,22 +129,14 @@ func (rs *Requests) DelRequested(index uint32) bool {
 	return r
 }
 
-func (rs *Requests) enqueue(r Request, atend bool) bool {
-	if rs.bitmap.Get(int(r.index)) {
+func (rs *Requests) Enqueue(index uint32) bool {
+	if rs.bitmap.Get(int(index)) {
 		return false
 	}
-	rs.bitmap.Set(int(r.index))
-	r.ctime = time.Time{}
-	if atend {
-		rs.queue = append(rs.queue, r)
-	} else {
-		rs.queue = append([]Request{r}, rs.queue...)
-	}
+	r := Request{index: index, qtime: time.Now()}
+	rs.queue = append(rs.queue, r)
+	rs.bitmap.Set(int(index))
 	return true
-}
-
-func (rs *Requests) Enqueue(index uint32) bool {
-	return rs.enqueue(Request{index: index, qtime: time.Now()}, true)
 }
 
 func (rs *Requests) Dequeue() (request Request, index uint32) {
