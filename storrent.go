@@ -74,17 +74,21 @@ func main() {
 
 	err = config.SetDefaultProxy(proxyURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("SetDefaultProxy: %v", err)
+		return
 	}
 
 	if config.DefaultEncryption < 0 || config.DefaultEncryption > 5 {
-		log.Fatal("Wrong value for -encryption")
+		log.Printf("Wrong value %v for -encryption",
+			config.DefaultEncryption)
+		return
 	}
 
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Create(cpuprofile): %v", err)
+			return
 		}
 		pprof.StartCPUProfile(f)
 		defer func() {
@@ -97,7 +101,8 @@ func main() {
 		defer func() {
 			f, err := os.Create(memprofile)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("Create(memprofile): %v", err)
+				return
 			}
 			pprof.WriteHeapProfile(f)
 			f.Close()
@@ -109,7 +114,8 @@ func main() {
 		defer func() {
 			f, err := os.Create(mutexprofile)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("Create(mutexprofile): %v", err)
+				return
 			}
 			pprof.Lookup("mutex").WriteTo(f, 0)
 			f.Close()
@@ -119,12 +125,14 @@ func main() {
 	if tracefile != "" {
 		f, err := os.Create(tracefile)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Create(tracefile): %v", err)
+			return
 		}
 		defer f.Close()
 		err = trace.Start(f)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("trace.Start: %v", err)
+			return
 		}
 		defer trace.Stop()
 	}
@@ -138,8 +146,21 @@ func main() {
 	peer.DownloadEstimator.Init(3 * time.Second)
 	peer.DownloadEstimator.Start()
 
+	terminate := make(chan os.Signal, 1)
+	signal.Notify(terminate, syscall.SIGINT)
+
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	portmapdone := make(chan struct{})
+	defer func(portmapdone <-chan struct{}) {
+		cancelCtx()
+		log.Printf("Shutting down...")
+		timer := time.NewTimer(4 * time.Second)
+		select {
+		case <-portmapdone:
+			timer.Stop()
+		case <-timer.C:
+		}
+	}(portmapdone)
 
 	if portmap.Do {
 		go func() {
@@ -163,6 +184,15 @@ func main() {
 				config.DHTBootstrap, err)
 		}
 	}
+	defer func() {
+		if config.DHTBootstrap != "" {
+			err := rundht.Write(config.DHTBootstrap, id)
+			if err != nil {
+				log.Printf("Couldn't write %v: %v",
+					config.DHTBootstrap, err)
+			}
+		}
+	}()
 
 	config.DhtID = make([]byte, 20)
 	if id != nil {
@@ -170,13 +200,15 @@ func main() {
 	} else {
 		_, err := crand.Read(config.DhtID)
 		if err != nil {
-			log.Fatalf("Random: %v", err)
+			log.Printf("Random: %v", err)
+			return
 		}
 	}
 
 	dhtevent, err := rundht.Run(ctx, config.DhtID, config.ProtocolPort)
 	if err != nil {
-		log.Fatalf("DHT: %v", err)
+		log.Printf("DHT: %v", err)
+		return
 	}
 
 	go rundht.Handle(dhtevent)
@@ -194,18 +226,26 @@ func main() {
 				if err != nil {
 					var perr tor.ErrParseURL
 					if !errors.As(err, &perr) {
-						log.Fatal(err)
+						log.Printf("GetTorrent(%v): %v",
+							arg, err)
+						terminate <- nil
+						return
 					}
 				}
 			}
 			if t == nil {
 				torfile, err := os.Open(arg)
 				if err != nil {
-					log.Fatal(err)
+					log.Printf("Open(%v): %v", arg, err)
+					terminate <- nil
+					return
 				}
 				t, err = tor.ReadTorrent(proxy, torfile)
 				if err != nil {
-					log.Fatalf("%v: %v\n", arg, err)
+					log.Printf("%v: %v\n", arg, err)
+					terminate <- nil
+					torfile.Close()
+					return
 				}
 				torfile.Close()
 			}
@@ -222,7 +262,8 @@ func main() {
 	listener, err :=
 		net.Listen("tcp", fmt.Sprintf(":%v", config.ProtocolPort))
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Listen: %v", err)
+		return
 	}
 
 	go listen(listener)
@@ -231,7 +272,8 @@ func main() {
 	go func() {
 		log.Printf("Listening on http://%v", config.HTTPAddr)
 		err := http.ListenAndServe(config.HTTPAddr, nil)
-		log.Fatalf("ListenAndServe: %v", err)
+		log.Printf("ListenAndServe: %v", err)
+		return
 	}()
 
 	go func() {
@@ -255,27 +297,7 @@ func main() {
 		}
 	}()
 
-	terminate := make(chan os.Signal, 1)
-	signal.Notify(terminate, syscall.SIGINT)
 	<-terminate
-
-	if config.DHTBootstrap != "" {
-		err := rundht.Write(config.DHTBootstrap, id)
-		if err != nil {
-			log.Printf("Couldn't write %v: %v",
-				config.DHTBootstrap, err)
-		}
-	}
-
-	cancelCtx()
-
-	log.Printf("Shutting down...")
-	timer := time.NewTimer(4 * time.Second)
-	select {
-	case <-portmapdone:
-		timer.Stop()
-	case <-timer.C:
-	}
 }
 
 func listen(listener net.Listener) {
