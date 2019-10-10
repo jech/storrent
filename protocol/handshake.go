@@ -46,7 +46,8 @@ func readMore(conn net.Conn, buf []byte, n int, m int) ([]byte, error) {
 	}
 
 	buf = append(buf, make([]byte, m - l)...)
-	_, err := io.ReadAtLeast(conn, buf[l:], n - l)
+	k, err := io.ReadAtLeast(conn, buf[l:], n - l)
+	buf = buf[:l + k]
 	return buf, err
 }
 
