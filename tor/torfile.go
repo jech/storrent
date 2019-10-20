@@ -243,8 +243,10 @@ func (torrent *Torrent) Complete() error {
 	torrent.inFlight = make([]uint8, chunks)
 
 	torrent.PieceHashes = hashes
-	torrent.Name = info.Name8
-	if torrent.Name == "" {
+	// torrent.Name may have been populated earlier
+	if info.Name8 != "" {
+		torrent.Name = info.Name8
+	} else {
 		torrent.Name = info.Name
 	}
 	if torrent.Name == "" {
