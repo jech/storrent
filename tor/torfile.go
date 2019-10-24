@@ -75,36 +75,36 @@ func webseedList(urls []string, getright bool) []webseed.Webseed {
 	return l
 }
 
-type ErrUnknownScheme struct {
+type UnknownSchemeError struct {
 	Scheme string
 }
 
-func (e ErrUnknownScheme) Error() string {
+func (e UnknownSchemeError) Error() string {
 	if e.Scheme == "" {
 		return "missing scheme"
 	}
 	return fmt.Sprintf("unknown scheme %v", e.Scheme)
 }
 
-type ErrParseURL struct {
+type ParseURLError struct {
 	Err error
 }
 
-func (e ErrParseURL) Error() string {
+func (e ParseURLError) Error() string {
 	return e.Err.Error()
 }
 
-func (e ErrParseURL) Unwrap() error {
+func (e ParseURLError) Unwrap() error {
 	return e.Err
 }
 
 func GetTorrent(ctx context.Context, proxy string, url string) (*Torrent, error) {
 	u, err := nurl.Parse(url)
 	if err == nil && u.Scheme != "http" && u.Scheme != "https" {
-		err = ErrUnknownScheme{u.Scheme}
+		err = UnknownSchemeError{u.Scheme}
 	}
 	if err != nil {
-		return nil, ErrParseURL{err}
+		return nil, ParseURLError{err}
 	}
 
 	req, err := http.NewRequest("GET", url, nil)

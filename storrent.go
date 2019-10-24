@@ -224,7 +224,7 @@ func main() {
 			if t == nil {
 				t, err = tor.GetTorrent(ctx, proxy, arg)
 				if err != nil {
-					var perr tor.ErrParseURL
+					var perr tor.ParseURLError
 					if !errors.As(err, &perr) {
 						log.Printf("GetTorrent(%v): %v",
 							arg, err)
