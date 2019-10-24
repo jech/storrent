@@ -146,7 +146,7 @@ func (ps *Pieces) PieceBitmap(n uint32) (int, bitmap.Bitmap) {
 	return chunks, v
 }
 
-func (ps *Pieces) pieceLength(index uint32) uint32 {
+func (ps *Pieces) PieceLength(index uint32) uint32 {
 	last := uint32(ps.length / int64(ps.pieceSize))
 	if index < last {
 		return ps.pieceSize
@@ -156,15 +156,8 @@ func (ps *Pieces) pieceLength(index uint32) uint32 {
 	return 0
 }
 
-func (ps *Pieces) PieceLength(index uint32) uint32 {
-	ps.RLock()
-	v := ps.pieceLength(index)
-	ps.RUnlock()
-	return v
-}
-
 func (ps *Pieces) pieceChunks(index uint32) int {
-	return int((ps.pieceLength(index) + config.ChunkSize - 1) /
+	return int((ps.PieceLength(index) + config.ChunkSize - 1) /
 		config.ChunkSize)
 }
 
@@ -230,7 +223,7 @@ func (ps *Pieces) AddData(index uint32, begin uint32, data []byte, peer uint32) 
 		return
 	}
 	cs := config.ChunkSize
-	pl := ps.pieceLength(index)
+	pl := ps.PieceLength(index)
 
 	if begin%cs != 0 {
 		err = errors.New("adding data at odd offset")
@@ -402,7 +395,7 @@ func (ps *Pieces) Hole(index, offset uint32) (uint32, uint32) {
 
 	o := uint32(first) * config.ChunkSize
 	if count == chunks {
-		return o, ps.pieceLength(index) - uint32(first)*config.ChunkSize
+		return o, ps.PieceLength(index) - uint32(first)*config.ChunkSize
 	}
 	return o, uint32(count) * config.ChunkSize
 }
