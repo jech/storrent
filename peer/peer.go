@@ -40,6 +40,13 @@ type Requested struct {
 	Index, Begin, Length uint32
 }
 
+type pexState struct {
+	pending    []pex.Peer
+	pendingDel []pex.Peer
+	sent       []pex.Peer
+	sentTime   time.Time
+}
+
 type Peer struct {
 	proxy             string
 	infoHash          hash.Hash
@@ -83,10 +90,7 @@ type Peer struct {
 	writeTime         time.Time
 	pex               []pex.Peer
 	pexTorTime        time.Time
-	pexToSend         []pex.Peer
-	pexToDel          []pex.Peer
-	pexSent           []pex.Peer
-	pexSentTime       time.Time
+	pexState          pexState
 	download          rate.Estimator
 	avgDownload       rate.Estimator
 	upload            rate.Estimator
@@ -359,9 +363,9 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 				maybeRequest(peer)
 			}
 
-			if time.Since(peer.pexSentTime) >= time.Minute {
+			if time.Since(peer.pexState.sentTime) >= time.Minute {
 				sendPex(peer)
-				peer.pexSentTime = time.Now()
+				peer.pexState.sentTime = time.Now()
 			}
 
 			if time.Since(peer.pexTorTime) >= 20*time.Minute {
@@ -499,9 +503,13 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 		}
 
 		if c.Add {
-			doPex(peer, c.Peers, nil)
+			for _, p := range c.Peers {
+				peer.pexState.add(p)
+			}
 		} else {
-			doPex(peer, nil, c.Peers)
+			for _, d := range c.Peers {
+				peer.pexState.del(d)
+			}
 		}
 	case PeerGetStatus:
 		var down float64
@@ -1340,103 +1348,93 @@ func (peer *Peer) CanMetadata() bool {
 	return atomic.LoadUint32(&peer.metadataExt) != 0
 }
 
-func doPex(peer *Peer, add, del []pex.Peer) {
-	if peer.pexExt == 0 {
-		return
-	}
-
-	for _, p := range add {
-		pexAdd(peer, p)
-	}
-
-	for _, d := range del {
-		pexDel(peer, d)
-	}
-}
-
-func pexAdd(peer *Peer, p pex.Peer) {
-	i := pex.Find(p, peer.pexToDel)
+func (state *pexState) add(p pex.Peer) {
+	i := pex.Find(p, state.pendingDel)
 	if i >= 0 {
-		peer.pexToDel =
-			append(peer.pexToDel[:i], peer.pexToDel[i+1:]...)
-		if len(peer.pexToDel) == 0 {
-			peer.pexToDel = nil
+		state.pendingDel =
+			append(state.pendingDel[:i], state.pendingDel[i+1:]...)
+		if len(state.pendingDel) == 0 {
+			state.pendingDel = nil
 		}
 		return
 	}
 
-	i = pex.Find(p, peer.pexSent)
+	i = pex.Find(p, state.sent)
 	if i >= 0 {
 		return
 	}
 
-	i = pex.Find(p, peer.pexToSend)
+	i = pex.Find(p, state.pending)
 	if i >= 0 {
 		return
 	}
 
-	peer.pexToSend = append(peer.pexToSend, p)
+	state.pending = append(state.pending, p)
 }
 
-func pexDel(peer *Peer, p pex.Peer) {
-	i := pex.Find(p, peer.pexToSend)
+func (state *pexState) del(p pex.Peer) {
+	i := pex.Find(p, state.pending)
 	if i >= 0 {
-		peer.pexToSend =
-			append(peer.pexToSend[:i], peer.pexToSend[i+1:]...)
-		if len(peer.pexToSend) == 0 {
-			peer.pexToSend = nil
+		state.pending =
+			append(state.pending[:i], state.pending[i+1:]...)
+		if len(state.pending) == 0 {
+			state.pending = nil
 		}
 		return
 	}
 
-	i = pex.Find(p, peer.pexSent)
+	i = pex.Find(p, state.sent)
 	if i < 0 {
 		return
 	}
-	peer.pexSent = append(peer.pexSent[:i], peer.pexSent[i+1:]...)
-	if len(peer.pexSent) == 0 {
-		peer.pexSent = nil
+	state.sent = append(state.sent[:i], state.sent[i+1:]...)
+	if len(state.sent) == 0 {
+		state.sent = nil
 	}
 
-	i = pex.Find(p, peer.pexToDel)
+	i = pex.Find(p, state.pendingDel)
 	if i >= 0 {
 		return
 	}
 
-	peer.pexToDel = append(peer.pexToDel, p)
+	state.pendingDel = append(state.pendingDel, p)
 }
 
-func sendPex(peer *Peer) {
-	if peer.pexExt == 0 {
-		return
-	}
-
-	if len(peer.pexToSend) == 0 && len(peer.pexToDel) == 0 {
-		return
-	}
-
-	if isCongested(peer) {
-		return
+func computePex(state *pexState) ([]pex.Peer, []pex.Peer) {
+	if len(state.pending) == 0 && len(state.pendingDel) == 0 {
+		return nil, nil
 	}
 
 	var tosend, todel []pex.Peer
-	if len(peer.pexToSend) > 50 {
-		tosend = peer.pexToSend[:50]
-		peer.pexToSend = peer.pexToSend[50:]
+	if len(state.pending) > 50 {
+		tosend = state.pending[:50]
+		state.pending = state.pending[50:]
 	} else {
-		tosend = peer.pexToSend
-		peer.pexToSend = nil
+		tosend = state.pending
+		state.pending = nil
 	}
-	if len(peer.pexToDel) > 50 {
-		todel = peer.pexToDel[:50]
-		peer.pexToDel = peer.pexToDel[50:]
+	if len(state.pendingDel) > 50 {
+		todel = state.pendingDel[:50]
+		state.pendingDel = state.pendingDel[50:]
 	} else {
-		todel = peer.pexToDel
-		peer.pexToDel = nil
+		todel = state.pendingDel
+		state.pendingDel = nil
 	}
 
-	write(peer, protocol.ExtendedPex{uint8(peer.pexExt), tosend, todel})
-	peer.pexSent = append(peer.pexSent, tosend...)
+	state.sent = append(state.sent, tosend...)
+	return tosend, todel
+}
+
+func sendPex(peer *Peer) {
+	if peer.pexExt == 0 || isCongested(peer) {
+		return
+	}
+
+	tosend, todel := computePex(&peer.pexState)
+	if len(tosend) > 0 || len(todel) > 0 {
+		write(peer,
+			protocol.ExtendedPex{uint8(peer.pexExt), tosend, todel})
+	}
 }
 
 func hasProxy(peer *Peer) bool {
