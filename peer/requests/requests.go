@@ -1,8 +1,8 @@
 package requests
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	"storrent/bitmap"
@@ -40,7 +40,7 @@ type Requests struct {
 }
 
 func (rs *Requests) String() string {
-	b := new(bytes.Buffer)
+	var b = new(strings.Builder)
 
 	fmt.Fprintf(b, "[[")
 	for _, v := range rs.queue {
