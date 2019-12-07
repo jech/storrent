@@ -1426,7 +1426,7 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 	if periodic && numUnchoking >= maxUnchoking {
 		dosort(true, false)
 		for _, n := range ps {
-			if stats[n].AmUnchoking {
+			if stats[n] != nil && stats[n].AmUnchoking {
 				choke = t.peers[n]
 				numUnchoking--
 				break
@@ -1441,11 +1441,10 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 	dosort(false, t.rand.Intn(5) == 0)
 	for _, pn := range ps {
 		p := t.peers[pn]
-		if stats[pn] == nil {
+		if stats[pn] == nil || !stats[pn].Interested {
 			continue
 		}
-		if (p == choke || !stats[pn].AmUnchoking) &&
-			stats[pn].Interested {
+		if p == choke || !stats[pn].AmUnchoking
 			if p == choke {
 				choke = nil
 				numUnchoking++
