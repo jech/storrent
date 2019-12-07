@@ -1135,15 +1135,17 @@ func rto(peer *Peer) time.Duration {
 }
 
 func maybeRequest(peer *Peer) {
+	if peer.unchoked == 0 && len(peer.fast) == 0 {
+		return
+	}
+
 	rate := peer.download.Estimate()
 	maxdelay := float64(rto(peer)) / float64(time.Second)
 	if maxdelay > 10 {
 		maxdelay = 10
 	}
-	for peer.requests.Queue() > 0 {
-		if peer.unchoked == 0 && len(peer.fast) == 0 {
-			break
-		}
+
+	for !isCongested(peer) && peer.requests.Queue() > 0 {
 		nr := peer.requests.Requested()
 		bytes := float64((nr + 1) * int(config.ChunkSize))
 		if nr >= 2 && (nr >= peer.reqQ || bytes/rate > maxdelay) {
@@ -1166,7 +1168,8 @@ func maybeRequest(peer *Peer) {
 		}
 		peer.requests.EnqueueRequest(q)
 	}
-	if peer.unchoked != 0 && peer.requests.Requested() > 0 {
+
+	if peer.requests.Requested() > 0 {
 		peer.download.Start()
 	} else {
 		peer.download.Stop()
