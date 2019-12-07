@@ -62,7 +62,7 @@ type Peer struct {
 	bitmap            bitmap.Bitmap
 	isSeed            bool
 	unchoked          uint32
-	interested        bool
+	interested        uint32
 	amUnchoking       uint32
 	shouldInterested  bool
 	amInterested      bool
@@ -518,7 +518,7 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 		}
 		c.Ch <- PeerStatus{
 			peer.unchoked != 0,
-			peer.interested,
+			peer.interested != 0,
 			peer.amUnchoking != 0,
 			peer.amInterested,
 			isSeed(peer),
@@ -537,7 +537,7 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 		}
 		c.Ch <- PeerStats{
 			peer.unchoked != 0,
-			peer.interested,
+			peer.interested != 0,
 			peer.amUnchoking != 0,
 			peer.amInterested,
 			isSeed(peer), peer.uploadOnly,
@@ -761,10 +761,10 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 		atomic.StoreUint32(&peer.unchoked, 1)
 		writeEvent(peer, TorPeerUnchoke{peer, true})
 	case protocol.Interested:
-		peer.interested = true
+		atomic.StoreUint32(&peer.interested, 1)
 		writeEvent(peer, TorPeerInterested{peer, true})
 	case protocol.NotInterested:
-		peer.interested = false
+		atomic.StoreUint32(&peer.interested, 0)
 		unchoke(peer, false)
 		writeEvent(peer, TorPeerInterested{peer, false})
 	case protocol.Have:
@@ -1162,7 +1162,7 @@ done:
 }
 
 func unchoke(peer *Peer, unchoke bool) {
-	if unchoke && !peer.interested {
+	if unchoke && peer.interested == 0 {
 		peer.Log.Printf("Attempted to unchoke uninterested peer")
 		unchoke = false
 	}
@@ -1334,6 +1334,10 @@ func (peer *Peer) GetHave(index uint32) bool {
 
 func (peer *Peer) Unchoked() bool {
 	return atomic.LoadUint32(&peer.unchoked) != 0
+}
+
+func (peer *Peer) Interested() bool {
+	return atomic.LoadUint32(&peer.interested) != 0
 }
 
 func (peer *Peer) AmUnchoking() bool {
