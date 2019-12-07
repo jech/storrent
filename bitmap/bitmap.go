@@ -4,6 +4,7 @@ package bitmap
 
 import (
 	"math/bits"
+	"strings"
 )
 
 type Bitmap []uint8
@@ -21,17 +22,18 @@ func (b Bitmap) Get(i int) bool {
 }
 
 func (b Bitmap) String() string {
-	a := make([]byte, 0, len(b)*8+2)
-	a = append(a, uint8('['))
+	var buf strings.Builder
+	buf.Grow(len(b)*8 + 2)
+	buf.WriteByte('[')
 	for i := 0; i < len(b)*8; i++ {
 		if b.Get(i) {
-			a = append(a, byte('1'))
+			buf.WriteByte('1')
 		} else {
-			a = append(a, byte('0'))
+			buf.WriteByte('0')
 		}
 	}
-	a = append(a, byte(']'))
-	return string(a)
+	buf.WriteByte(']')
+	return buf.String()
 }
 
 // Extend sets the length of the bitmap to at least the smallest multiple
