@@ -643,6 +643,18 @@ func write(peer *Peer, m protocol.Message) error {
 		return nil
 	case <-peer.writerDone:
 		return io.EOF
+	default:
+		timer := time.NewTimer(200 * time.Millisecond)
+		select {
+		case peer.writer <- m:
+			peer.writeTime = time.Now()
+			timer.Stop()
+			return nil
+		case <-peer.writerDone:
+			return io.EOF
+		case <-timer.C:
+			return ErrCongested
+		}
 	}
 }
 
