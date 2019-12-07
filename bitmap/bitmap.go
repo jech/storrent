@@ -10,7 +10,7 @@ import (
 type Bitmap []uint8
 
 func New(length int) Bitmap {
-	return Bitmap(make([]uint8, (length + 7) / 8))
+	return Bitmap(make([]uint8, (length+7)/8))
 }
 
 // Get returns true if the ith bit is set.
