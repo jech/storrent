@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"bufio"
-	"bytes"
 	"github.com/zeebo/bencode"
 	"log"
 	"net"
@@ -55,8 +54,10 @@ func startMessage(w *bufio.Writer, len uint32, tpe byte) error {
 	return nil
 }
 
-func sendMessage(w *bufio.Writer, tpe byte, data1, data2 []byte) error {
-	err := startMessage(w, uint32(len(data1) + len(data2) + 1), tpe)
+func sendMessage(w *bufio.Writer, tpe byte, data1, data2, data3 []byte) error {
+	err := startMessage(w,
+		uint32(len(data1) + len(data2) + len(data3) + 1),
+		tpe)
 	if err != nil {
 		return err
 	}
@@ -69,6 +70,12 @@ func sendMessage(w *bufio.Writer, tpe byte, data1, data2 []byte) error {
 	}
 	if data2 != nil {
 		_, err = w.Write(data2)
+		if err != nil {
+			return err
+		}
+	}
+	if data3 != nil {
+		_, err = w.Write(data3)
 		if err != nil {
 			return err
 		}
@@ -112,8 +119,8 @@ func sendMessage3(w *bufio.Writer, tpe byte, v1, v2, v3 uint32) error {
 	return writeUint32(w, v3)
 }
 
-func sendExtended(w *bufio.Writer, subtype byte, value []byte) error {
-	return sendMessage(w, 20, []byte{subtype}, value)
+func sendExtended(w *bufio.Writer, subtype byte, data1, data2 []byte) error {
+	return sendMessage(w, 20, []byte{subtype}, data1, data2)
 }
 
 func Write(w *bufio.Writer, m Message, l *log.Logger) error {
@@ -144,7 +151,7 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		return sendMessage1(w, 4, m.Index)
 	case Bitfield:
 		debugf("-> Bitfield %v", len(m.Bitfield))
-		return sendMessage(w, 5, m.Bitfield, nil)
+		return sendMessage(w, 5, m.Bitfield, nil, nil)
 	case Request:
 		debugf("-> Request %v %v %v", m.Index, m.Begin, m.Length)
 		return sendMessage3(w, 6, m.Index, m.Begin, m.Length)
@@ -153,7 +160,7 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		b := make([]byte, 8)
 		formatUint32(b, m.Index)
 		formatUint32(b[4:], m.Begin)
-		err := sendMessage(w, 7, b, m.Data)
+		err := sendMessage(w, 7, b, m.Data, nil)
 		PutBuffer(m.Data)
 		m.Data = nil
 		return err
@@ -199,7 +206,7 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		if err != nil {
 			return err
 		}
-		return sendExtended(w, 0, b)
+		return sendExtended(w, 0, b, nil)
 	case ExtendedMetadata:
 		debugf("-> ExtendedMetadata %v %v", m.Type, m.Piece)
 		tpe := m.Type
@@ -209,22 +216,14 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 			totalsize := m.TotalSize
 			info.TotalSize = &totalsize
 		}
-		buf := new(bytes.Buffer)
-		encoder := bencode.NewEncoder(buf)
-		err := encoder.Encode(info)
-		if err != nil {
-			return err
-		}
-		if m.Data != nil {
-			_, err = buf.Write(m.Data)
-		}
+		b, err := bencode.EncodeBytes(info)
 		if err != nil {
 			return err
 		}
 		if m.Subtype == 0 {
 			panic("ExtendedMetadata subtype is 0")
 		}
-		return sendExtended(w, m.Subtype, buf.Bytes())
+		return sendExtended(w, m.Subtype, b, m.Data)
 	case ExtendedPex:
 		debugf("-> ExtendedPex %v %v", len(m.Added), len(m.Dropped))
 		a4, f4, a6, f6 := pex.FormatCompact(m.Added)
@@ -241,14 +240,14 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		if err != nil {
 			return err
 		}
-		return sendExtended(w, m.Subtype, b)
+		return sendExtended(w, m.Subtype, b, nil)
 	case ExtendedDontHave:
 		debugf("-> ExtendedDontHave %v", m.Index)
 		b := formatUint32(make([]byte, 4), m.Index)
 		if m.Subtype == 0 {
 			panic("ExtendedDontHave subtype is 0")
 		}
-		return sendExtended(w, m.Subtype, b)
+		return sendExtended(w, m.Subtype, b, nil)
 	default:
 		panic("Unknown message")
 	}
