@@ -259,7 +259,7 @@ func Writer(conn net.Conn, l *log.Logger, ch <-chan Message, done chan<- struct{
 	w := bufio.NewWriter(conn)
 
 	write := func(m Message) error {
-		err := conn.SetWriteDeadline(time.Now().Add(4 * time.Second))
+		err := conn.SetWriteDeadline(time.Now().Add(time.Minute))
 		if err != nil {
 			return err
 		}
@@ -267,7 +267,7 @@ func Writer(conn net.Conn, l *log.Logger, ch <-chan Message, done chan<- struct{
 	}
 
 	flush := func() error {
-		err := conn.SetWriteDeadline(time.Now().Add(4 * time.Second))
+		err := conn.SetWriteDeadline(time.Now().Add(time.Minute))
 		if err != nil {
 			return err
 		}
