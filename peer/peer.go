@@ -521,10 +521,10 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 		peer.shouldInterested = c.Interested
 		maybeInterested(peer)
 	case PeerGetMetadata:
-		if peer.metadataExt == 0 {
+		if peer.metadataExt == 0 || isCongested(peer) {
 			return nil
 		}
-		maybeWrite(peer, protocol.ExtendedMetadata{
+		write(peer, protocol.ExtendedMetadata{
 			uint8(peer.metadataExt), 0, c.Index, 0, nil})
 	case PeerPex:
 		if peer.pexExt == 0 {
@@ -660,21 +660,6 @@ func write(peer *Peer, m protocol.Message) error {
 
 func isCongested(peer *Peer) bool {
 	return len(peer.writer) > cap(peer.writer)/2
-}
-
-func maybeWrite(peer *Peer, m protocol.Message) error {
-	if isCongested(peer) {
-		return ErrCongested
-	}
-	select {
-	case peer.writer <- m:
-		peer.writeTime = time.Now()
-		return nil
-	case <-peer.writerDone:
-		return io.EOF
-	default:
-		return ErrCongested
-	}
 }
 
 func writeEvent(peer *Peer, m TorEvent) {
@@ -1054,7 +1039,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 		}
 	case protocol.ExtendedMetadata:
 		if m.Type == 0 {
-			if peer.metadataExt == 0 {
+			if peer.metadataExt == 0 || isCongested(peer) {
 				return nil
 			}
 			offset := int(m.Piece) * 16 * 1024
@@ -1064,7 +1049,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			}
 			var err error
 			if l > 0 {
-				err = maybeWrite(peer, protocol.ExtendedMetadata{
+				err = write(peer, protocol.ExtendedMetadata{
 					uint8(peer.metadataExt), 1,
 					m.Piece, uint32(len(peer.Info)),
 					peer.Info[offset : offset+l]})
@@ -1160,7 +1145,7 @@ func maybeRequest(peer *Peer) {
 			continue
 		}
 
-		err := maybeWrite(peer, protocol.Request{
+		err := write(peer, protocol.Request{
 			i, b, chunkSize(peer, index)})
 		if err != nil {
 			drop(peer, index)
@@ -1209,7 +1194,7 @@ func scheduleUpload(peer *Peer, immediate bool) error {
 			goto done
 		}
 		m := protocol.Piece{r.Index, r.Begin, data}
-		err := maybeWrite(peer, m)
+		err := write(peer, m)
 		if err == nil {
 			peer.upload.Accumulate(int(r.Length))
 			UploadEstimator.Accumulate(int(r.Length))
