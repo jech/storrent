@@ -1119,6 +1119,9 @@ func maybeRequest(peer *Peer) {
 
 func scheduleUpload(peer *Peer, immediate bool) {
 	if immediate && peer.amUnchoking != 0 && len(peer.requested) > 0 {
+		if isCongested(peer) {
+			goto done
+		}
 		r := peer.requested[0]
 		upload := config.UploadRate()
 		fair := upload / float64(NumUnchoking())
