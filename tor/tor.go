@@ -1373,22 +1373,25 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 const maxUnchoking = 5
 
 func maybeUnchoke(t *Torrent, periodic bool) {
+	ps := t.rand.Perm(len(t.peers))
+	stats := make([]*peer.PeerStatus, len(t.peers))
 	numUnchoking := 0
-	for _, p := range t.peers {
-		if p.AmUnchoking() {
+	for i, p := range t.peers {
+		amUnchoking := p.AmUnchoking()
+		if amUnchoking {
 			numUnchoking++
+		}
+		if amUnchoking || p.Interested() {
+			stats[i] = p.GetStatus()
 		}
 	}
 
-	if config.UploadRate() <= 0 ||
-		(!periodic && numUnchoking >= maxUnchoking) {
+	if config.UploadRate() <= 0 && numUnchoking == 0 {
 		return
 	}
 
-	ps := t.rand.Perm(len(t.peers))
-	stats := make([]*peer.PeerStatus, len(t.peers))
-	for i, p := range t.peers {
-		stats[i] = p.GetStatus()
+	if !periodic && numUnchoking >= maxUnchoking {
+		return
 	}
 
 	dosort := func(ascending bool, optimistic bool) {
@@ -1444,7 +1447,7 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 		if stats[pn] == nil || !stats[pn].Interested {
 			continue
 		}
-		if p == choke || !stats[pn].AmUnchoking
+		if p == choke || !stats[pn].AmUnchoking {
 			if p == choke {
 				choke = nil
 				numUnchoking++
