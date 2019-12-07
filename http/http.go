@@ -762,29 +762,30 @@ func recent(tm time.Time) bool {
 func hknown(w http.ResponseWriter, kp *known.Peer, t *tor.Torrent) {
 	buf := new(bytes.Buffer)
 	if kp.Attempts > 0 {
-		fmt.Fprintf(buf, ", %v", kp.Attempts)
+		fmt.Fprintf(buf, "%v, ", kp.Attempts)
 	}
 	if recent(kp.SeenTime) || recent(kp.ActiveTime) {
-		fmt.Fprintf(buf, ", Seen")
+		fmt.Fprintf(buf, "Seen, ")
 	}
 	if recent(kp.HeardTime) {
-		fmt.Fprintf(buf, ", Heard")
+		fmt.Fprintf(buf, "Heard, ")
 	}
 	if recent(kp.TrackerTime) {
-		fmt.Fprintf(buf, ", T")
+		fmt.Fprintf(buf, "T, ")
 	}
 	if recent(kp.DHTTime) {
-		fmt.Fprintf(buf, ", DHT")
+		fmt.Fprintf(buf, "DHT, ")
 	}
 	if recent(kp.PEXTime) {
-		fmt.Fprintf(buf, ", PEX")
+		fmt.Fprintf(buf, "PEX, ")
 	}
 	if kp.Bad() {
-		fmt.Fprintf(buf, ", Bad")
+		fmt.Fprintf(buf, "Bad, ")
 	}
 	var flags string
 	if buf.Len() > 2 {
-		flags = string(buf.Bytes()[2:])
+		b := buf.Bytes()
+		flags = string(b[0:len(b) - 2])
 	} else {
 		flags = buf.String()
 	}
