@@ -244,7 +244,7 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 				peer.IP.To4() == nil))
 			ipv6 = getIPv6()
 		}
-		write(peer, protocol.Extended0{
+		err := write(peer, protocol.Extended0{
 			Version:      version,
 			Port:         port,
 			ReqQ:         reqQ,
@@ -258,30 +258,50 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 			},
 			Encrypt: crypto.OptionsMap[config.DefaultEncryption].PreferCryptoHandshake,
 		})
+		if err != nil {
+			return err
+		}
 	}
 
 	if peer.myBitmap.Empty() {
 		if peer.canFast {
-			write(peer, protocol.HaveNone{})
+			err := write(peer, protocol.HaveNone{})
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		if peer.canFast && amSeed(peer) {
-			write(peer, protocol.HaveAll{})
+			err := write(peer, protocol.HaveAll{})
+			if err != nil {
+				return err
+			}
 		} else {
 			count := peer.myBitmap.Count()
 			num := numPieces(peer)
 			if count < num/72 {
 				if peer.canFast {
-					write(peer, protocol.HaveNone{})
+					err := write(peer, protocol.HaveNone{})
+					if err != nil {
+						return err
+					}
 				}
+				var err error
 				peer.myBitmap.Range(func(i int) bool {
-					write(peer, protocol.Have{uint32(i)})
-					return true
+					err = write(peer,
+						protocol.Have{uint32(i)})
+					return err == nil
 				})
+				if err != nil {
+					return err
+				}
 			} else {
 				bitmap := peer.myBitmap.Copy()
 				bitmap.Extend(num)
-				write(peer, protocol.Bitfield{bitmap})
+				err := write(peer, protocol.Bitfield{bitmap})
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -356,7 +376,10 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 				peer.events = nil
 			}
 		case <-upload:
-			scheduleUpload(peer, true)
+			err := scheduleUpload(peer, true)
+			if err != nil {
+				return err
+			}
 		case <-ticker.C:
 			expired := expireRequests(peer)
 			if expired {
@@ -466,12 +489,18 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 	case PeerHave:
 		if c.Have {
 			peer.myBitmap.Set(int(c.Index))
-			write(peer, protocol.Have{c.Index})
+			err := write(peer, protocol.Have{c.Index})
+			if err != nil {
+				return err
+			}
 		} else {
 			peer.myBitmap.Reset(int(c.Index))
 			if peer.dontHaveExt > 0 {
-				write(peer, protocol.ExtendedDontHave{
+				err := write(peer, protocol.ExtendedDontHave{
 					uint8(peer.dontHaveExt), c.Index})
+				if err != nil {
+					return err
+				}
 			}
 		}
 		maybeInterested(peer)
@@ -586,9 +615,15 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 		c.Ch <- peer.bitmap.Get(int(c.Index))
 		close(c.Ch)
 	case PeerUnchoke:
-		unchoke(peer, c.Unchoke)
-		if c.Unchoke {
-			scheduleUpload(peer, false)
+		err := unchoke(peer, c.Unchoke)
+		if err != nil {
+			return err
+		}
+		if peer.unchoked != 0 {
+			err := scheduleUpload(peer, false)
+			if err != nil {
+				return err
+			}
 		} else {
 			peer.stopUpload()
 		}
@@ -794,18 +829,22 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 		maybeInterested(peer)
 	case protocol.Request:
 		if peer.Info == nil || peer.amUnchoking == 0 {
-			reject(peer, m.Index, m.Begin, m.Length)
-			return nil
+			return reject(peer, m.Index, m.Begin, m.Length)
 		}
 		if len(peer.requested) >= reqQ {
 			// head drop
 			r := peer.requested[0]
-			peer.requested = peer.requested[1:]
-			reject(peer, r.Index, r.Begin, r.Length)
+			err := reject(peer, r.Index, r.Begin, r.Length)
+			if err == nil {
+				peer.requested = peer.requested[1:]
+			}
 		}
 		peer.requested = append(peer.requested,
 			Requested{m.Index, m.Begin, m.Length})
-		scheduleUpload(peer, false)
+		err := scheduleUpload(peer, false)
+		if err != nil {
+			return err
+		}
 	case protocol.Piece:
 		if peer.Info == nil {
 			return ErrMetadataIncomplete
@@ -869,7 +908,10 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			}
 		}
 		if found {
-			reject(peer, m.Index, m.Begin, m.Length)
+			err := reject(peer, m.Index, m.Begin, m.Length)
+			if err != nil {
+				return err
+			}
 		}
 		peer.startStopUpload()
 	case protocol.Port:
@@ -1017,6 +1059,8 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 				if err == nil {
 					peer.upload.Accumulate(l)
 					UploadEstimator.Accumulate(l)
+				} else if err != ErrCongested {
+					return err
 				}
 			}
 			if l <= 0 || err != nil {
@@ -1117,7 +1161,7 @@ func maybeRequest(peer *Peer) {
 	}
 }
 
-func scheduleUpload(peer *Peer, immediate bool) {
+func scheduleUpload(peer *Peer, immediate bool) error {
 	if immediate && peer.amUnchoking != 0 && len(peer.requested) > 0 {
 		if isCongested(peer) {
 			goto done
@@ -1143,7 +1187,10 @@ func scheduleUpload(peer *Peer, immediate bool) {
 		if n != int(r.Length) {
 			protocol.PutBuffer(data)
 			data = nil
-			reject(peer, r.Index, r.Begin, r.Length)
+			err := reject(peer, r.Index, r.Begin, r.Length)
+			if err != nil {
+				return err
+			}
 			goto done
 		}
 		m := protocol.Piece{r.Index, r.Begin, data}
@@ -1152,44 +1199,56 @@ func scheduleUpload(peer *Peer, immediate bool) {
 			peer.upload.Accumulate(int(r.Length))
 			UploadEstimator.Accumulate(int(r.Length))
 			peer.active()
-		} else {
+		} else if err == ErrCongested {
 			m.Data = nil
 			protocol.PutBuffer(data)
 			peer.requested =
 				append([]Requested{r}, peer.requested...)
+		} else {
+			return err
 		}
 	}
 
 done:
 	peer.startStopUpload()
+	return nil
 }
 
-func unchoke(peer *Peer, unchoke bool) {
+func unchoke(peer *Peer, unchoke bool) error {
 	if unchoke && peer.interested == 0 {
 		peer.Log.Printf("Attempted to unchoke uninterested peer")
 		unchoke = false
 	}
 	if unchoke == (peer.amUnchoking != 0) {
-		return
+		return nil
 	}
 	if unchoke {
-		write(peer, protocol.Unchoke{})
-		atomic.StoreUint32(&peer.amUnchoking, 1)
-		atomic.AddInt32(&numUnchoking, 1)
-	} else {
-		write(peer, protocol.Choke{})
-		atomic.StoreUint32(&peer.amUnchoking, 0)
-		atomic.AddInt32(&numUnchoking, -1)
-		for _, r := range peer.requested {
-			reject(peer, r.Index, r.Begin, r.Length)
+		err := write(peer, protocol.Unchoke{})
+		if err == nil {
+			atomic.StoreUint32(&peer.amUnchoking, 1)
+			atomic.AddInt32(&numUnchoking, 1)
+			peer.unchokeTime = time.Now()
 		}
-		peer.requested = nil
+		return nil	// not an error
+	} else {
+		err := write(peer, protocol.Choke{})
+		if err != nil {
+			atomic.StoreUint32(&peer.amUnchoking, 0)
+			atomic.AddInt32(&numUnchoking, -1)
+			for _, r := range peer.requested {
+				err := reject(peer, r.Index, r.Begin, r.Length)
+				if err != nil {
+					return err
+				}
+			}
+			peer.requested = nil
+			peer.unchokeTime = time.Now()
+		}
+		return err
 	}
-	peer.unchokeTime = time.Now()
-	return
 }
 
-func maybeInterested(peer *Peer) {
+func maybeInterested(peer *Peer) error {
 	interested := false
 	if peer.shouldInterested && peer.Info != nil && peer.bitmap != nil {
 		peer.bitmap.Range(func(i int) bool {
@@ -1201,16 +1260,20 @@ func maybeInterested(peer *Peer) {
 		})
 	}
 	if interested == peer.amInterested {
-		return
+		return nil
 	}
 
+	var err error
 	if interested {
-		write(peer, protocol.Interested{})
+		err = write(peer, protocol.Interested{})
 	} else {
-		write(peer, protocol.NotInterested{})
+		err = write(peer, protocol.NotInterested{})
 	}
 
-	peer.amInterested = interested
+	if err == nil {
+		peer.amInterested = interested
+	}
+	return err
 }
 
 func isSeed(peer *Peer) bool {
@@ -1439,8 +1502,14 @@ func sendPex(peer *Peer) {
 
 	tosend, todel := computePex(&peer.pexState)
 	if len(tosend) > 0 || len(todel) > 0 {
-		write(peer,
+		err := write(peer,
 			protocol.ExtendedPex{uint8(peer.pexExt), tosend, todel})
+		if err != nil {
+			peer.pexState.pending =
+				append(tosend, peer.pexState.pending...)
+			peer.pexState.pendingDel =
+				append(todel, peer.pexState.pendingDel...)
+		}
 	}
 }
 
