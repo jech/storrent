@@ -619,7 +619,7 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 		if err != nil {
 			return err
 		}
-		if peer.unchoked != 0 {
+		if peer.amUnchoking != 0 {
 			err := scheduleUpload(peer, false)
 			if err != nil {
 				return err
