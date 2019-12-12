@@ -40,6 +40,10 @@ func (t *Torrent) NewReader(ctx context.Context, offset int64, length int64) *Re
 	return r
 }
 
+func (r *Reader) SetContext(ctx context.Context) {
+	r.context = ctx
+}
+
 func (r *Reader) Seek(o int64, whence int) (n int64, err error) {
 	if r.torrent == nil {
 		return r.position, errClosedReader
