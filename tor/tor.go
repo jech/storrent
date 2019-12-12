@@ -1373,94 +1373,90 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 const maxUnchoking = 5
 
 func maybeUnchoke(t *Torrent, periodic bool) {
+	unchoking := make([]*peer.Peer, 0, maxUnchoking)
+	interested := make([]*peer.Peer, 0)
 	ps := t.rand.Perm(len(t.peers))
-	stats := make([]*peer.PeerStatus, len(t.peers))
-	numUnchoking := 0
-	for i, p := range t.peers {
-		amUnchoking := p.AmUnchoking()
-		if amUnchoking {
-			numUnchoking++
-		}
-		if amUnchoking || p.Interested() {
-			stats[i] = p.GetStatus()
-		}
-	}
-
-	if config.UploadRate() <= 0 && numUnchoking == 0 {
-		return
-	}
-
-	if !periodic && numUnchoking >= maxUnchoking {
-		return
-	}
-
-	dosort := func(ascending bool, optimistic bool) {
-		sort.Slice(ps, func(i, j int) bool {
-			s1 := stats[ps[i]]
-			s2 := stats[ps[j]]
-			if s1 == nil || !s1.Interested {
-				return false
-			}
-			if s2 == nil || !s2.Interested {
-				return true
-			}
-			if !optimistic {
-				if s1.AvgDownload > s2.AvgDownload {
-					return !ascending
-				}
-				if s1.AvgDownload < s2.AvgDownload {
-					return ascending
-				}
-			}
-			if s1.UnchokeTime.Before(s2.UnchokeTime) {
-				return true
-			}
-			return false
-		})
-	}
-
-	var choke *peer.Peer
-	defer func() {
-		if choke != nil {
-			writePeer(choke, peer.PeerUnchoke{false})
-		}
-	}()
-
-	if periodic && numUnchoking >= maxUnchoking {
-		dosort(true, false)
-		for _, n := range ps {
-			if stats[n] != nil && stats[n].AmUnchoking {
-				choke = t.peers[n]
-				numUnchoking--
-				break
-			}
-		}
-	}
-
-	if numUnchoking >= maxUnchoking {
-		return
-	}
-
-	dosort(false, t.rand.Intn(5) == 0)
 	for _, pn := range ps {
 		p := t.peers[pn]
-		if stats[pn] == nil || !stats[pn].Interested {
-			continue
+		if p.AmUnchoking() {
+			unchoking = append(unchoking, p)
+		} else if p.Interested() {
+			interested = append(interested, p)
 		}
-		if p == choke || !stats[pn].AmUnchoking {
-			if p == choke {
-				choke = nil
-				numUnchoking++
-			} else {
-				err := writePeer(p, peer.PeerUnchoke{true})
-				if err == nil {
-					numUnchoking++
-				}
+	}
+
+	if !periodic && len(unchoking) == maxUnchoking {
+		return
+	}
+
+	sort.Slice(unchoking, func(i, j int) bool {
+		s1 := unchoking[i].GetStatus()
+		s2 := unchoking[j].GetStatus()
+		if s2 == nil {
+			return false
+		}
+		if s1 == nil {
+			return true
+		}
+		return s1.UnchokeTime.Before(s2.UnchokeTime)
+	})
+
+	for len(unchoking) > maxUnchoking {
+		writePeer(unchoking[0], peer.PeerUnchoke{false})
+		unchoking = unchoking[1:]
+	}
+
+	if !periodic && len(unchoking) >= maxUnchoking {
+		return
+	}
+
+	opportunistic := t.rand.Intn(5) == 0
+	sort.Slice(interested, func(i, j int) bool {
+		s1 := interested[i].GetStatus()
+		s2 := interested[j].GetStatus()
+
+		if s2 == nil {
+			return true
+		}
+		if s1 == nil {
+			return false
+		}
+
+		if !opportunistic {
+			if s1.AvgDownload > s2.AvgDownload {
+				return true
 			}
-			if numUnchoking >= maxUnchoking {
-				break
+			if s1.AvgDownload < s2.AvgDownload {
+				return false
 			}
 		}
+
+		return s1.UnchokeTime.Before(s2.UnchokeTime)
+	})
+
+	n := 0
+	for len(interested) > 0 && len(unchoking)+n < maxUnchoking {
+		err := writePeer(interested[0], peer.PeerUnchoke{true})
+		if err == nil {
+			n++
+			if(opportunistic) {
+				return
+			}
+		}
+		interested = interested[1:]
+	}
+
+	if !periodic || n > 0 {
+		return
+	}
+
+	for len(interested) > 0 && interested[0].AmUnchoking() {
+		interested = interested[1:]
+	}
+
+	if len(interested) > 0 && len(unchoking) > 0 {
+		writePeer(unchoking[0], peer.PeerUnchoke{false})
+		writePeer(interested[0], peer.PeerUnchoke{true})
 	}
 }
 
