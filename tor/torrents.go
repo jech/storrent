@@ -1,6 +1,7 @@
 package tor
 
 import (
+	"bytes"
 	"sync"
 	"storrent/hash"
 )
@@ -15,6 +16,19 @@ func Get(hash hash.Hash) *Torrent {
 		return nil
 	}
 	return v.(*Torrent)
+}
+
+func GetByName(name string) *Torrent {
+	var torrent *Torrent
+	Range(func(h hash.Hash, t *Torrent) bool {
+		if t.Name == name {
+			if torrent == nil || bytes.Compare(t.Hash, torrent.Hash) < 0 {
+				torrent = t
+			}
+		}
+		return true
+	})
+	return torrent
 }
 
 func Add(hash hash.Hash, torrent *Torrent) bool {
