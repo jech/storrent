@@ -54,22 +54,27 @@ func formatCompact(addrs []net.TCPAddr) ([]byte, []byte) {
 	return n4, n6
 }
 
-func Read(filename string) (id []byte, nodes []net.TCPAddr, err error) {
+func read(filename string) (bdht *BDHT, info os.FileInfo, err error) {
 	var r *os.File
 	r, err = os.Open(filename)
 	if err != nil {
 		return
 	}
+	defer r.Close()
 
-	info, err := r.Stat()
+	info, err = r.Stat()
 	if err != nil {
 		return
 	}
 
-	var bdht BDHT
 	decoder := bencode.NewDecoder(r)
 	err = decoder.Decode(&bdht)
-	r.Close()
+	return
+}
+
+func Read(filename string) (id []byte, nodes []net.TCPAddr, err error) {
+
+	bdht, info, err := read(filename)
 
 	if err != nil {
 		return
