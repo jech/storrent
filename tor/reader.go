@@ -16,7 +16,7 @@ type requested struct {
 	prio  int8
 }
 
-type reader struct {
+type Reader struct {
 	torrent *Torrent
 	offset  int64
 	length  int64
@@ -28,20 +28,19 @@ type reader struct {
 	context        context.Context
 }
 
-func (t *Torrent) NewReader(ctx context.Context,
-	offset int64, length int64) *reader {
-	r := &reader{
+func (t *Torrent) NewReader(ctx context.Context, offset int64, length int64) *Reader {
+	r := &Reader{
 		torrent:        t,
 		offset:         offset,
 		length:         length,
 		context:        ctx,
 		requestedIndex: -1,
 	}
-	runtime.SetFinalizer(r, (*reader).Close)
+	runtime.SetFinalizer(r, (*Reader).Close)
 	return r
 }
 
-func (r *reader) Seek(o int64, whence int) (n int64, err error) {
+func (r *Reader) Seek(o int64, whence int) (n int64, err error) {
 	if r.torrent == nil {
 		return r.position, errClosedReader
 	}
@@ -63,7 +62,7 @@ func (r *reader) Seek(o int64, whence int) (n int64, err error) {
 	return pos, nil
 }
 
-func (r *reader) chunks(pos int64, limit int64) []requested {
+func (r *Reader) chunks(pos int64, limit int64) []requested {
 	if pos < 0 || pos > limit {
 		return nil
 	}
@@ -104,7 +103,7 @@ func (r *reader) chunks(pos int64, limit int64) []requested {
 	return c
 }
 
-func (r *reader) request(pos int64, limit int64) (<-chan struct{}, error) {
+func (r *Reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 	if r.requestedIndex >= 0 {
 		index := uint32(pos / int64(r.torrent.Pieces.PieceSize()))
 		if r.requestedIndex == int(index) {
@@ -146,7 +145,7 @@ func (r *reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 	return done, err
 }
 
-func (r *reader) Read(a []byte) (n int, err error) {
+func (r *Reader) Read(a []byte) (n int, err error) {
 	t := r.torrent
 	if t == nil {
 		err = errClosedReader
@@ -202,7 +201,7 @@ func (r *reader) Read(a []byte) (n int, err error) {
 	return
 }
 
-func (r *reader) Close() error {
+func (r *Reader) Close() error {
 	r.request(-1, -1)
 	r.torrent = nil
 	runtime.SetFinalizer(r, nil)
