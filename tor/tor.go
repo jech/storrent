@@ -1717,8 +1717,7 @@ func (t *Torrent) Webseeds() []webseed.Webseed {
 	return t.webseeds
 }
 
-func (t *Torrent) Request(index uint32, prio int8, request bool,
-	want bool) (bool, <-chan struct{}, error) {
+func (t *Torrent) Request(index uint32, prio int8, request bool, want bool) (bool, <-chan struct{}, error) {
 	if atomic.LoadUint32(&t.infoComplete) == 0 {
 		return false, nil, ErrMetadataIncomplete
 	}
@@ -1745,7 +1744,7 @@ func (t *Torrent) Request(index uint32, prio int8, request bool,
 		}
 		return true, nil, nil
 	case <-t.Done:
-		return false, nil, nil
+		return false, nil, ErrTorrentDead
 	}
 }
 
