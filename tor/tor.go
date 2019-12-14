@@ -138,7 +138,7 @@ func AddTorrent(ctx context.Context, t *Torrent) (*Torrent, error) {
 	t.Done = make(chan struct{})
 	t.Deleted = make(chan struct{})
 
-	added := Add(t.Hash, t)
+	added := add(t)
 	if !added {
 		close(t.Done)
 		close(t.Deleted)

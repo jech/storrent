@@ -31,12 +31,13 @@ func GetByName(name string) *Torrent {
 	return torrent
 }
 
-func Add(hash hash.Hash, torrent *Torrent) bool {
+func add(torrent *Torrent) bool {
 	var h [20]byte
-	copy(h[:], hash)
+	copy(h[:], torrent.Hash)
 	_, exists := torrents.LoadOrStore(h, torrent)
 	return !exists
 }
+
 func del(hash hash.Hash) {
 	var h [20]byte
 	copy(h[:], hash)
