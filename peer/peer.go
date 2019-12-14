@@ -1232,7 +1232,7 @@ func unchoke(peer *Peer, unchoke bool) error {
 		return nil	// not an error
 	} else {
 		err := write(peer, protocol.Choke{})
-		if err != nil {
+		if err == nil {
 			atomic.StoreUint32(&peer.amUnchoking, 0)
 			atomic.AddInt32(&numUnchoking, -1)
 			for _, r := range peer.requested {
