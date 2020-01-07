@@ -20,6 +20,7 @@ import (
 
 	"storrent/config"
 	"storrent/crypto"
+	"storrent/fuse"
 	thttp "storrent/http"
 	"storrent/peer"
 	"storrent/physmem"
@@ -29,7 +30,8 @@ import (
 )
 
 func main() {
-	var proxyURL, cpuprofile, memprofile, mutexprofile, tracefile string
+	var proxyURL, mountpoint string
+	var cpuprofile, memprofile, mutexprofile, tracefile string
 
 	mem, err := physmem.Total()
 	if err != nil {
@@ -57,6 +59,8 @@ func main() {
 		"store execution trace in `file`")
 	flag.StringVar(&proxyURL, "proxy", "",
 		"`URL` of proxy to use for BitTorrent traffic")
+	flag.StringVar(&mountpoint, "mountpoint", "",
+		"FUSE `mountpoint`")
 	flag.BoolVar(&config.DefaultDhtPassive, "dht-passive", false,
 		"don't perform DHT announces by default")
 	flag.BoolVar(&config.DefaultUseTrackers, "use-trackers", false,
@@ -148,6 +152,19 @@ func main() {
 
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, syscall.SIGINT)
+
+	if mountpoint != "" {
+		err := fuse.Serve(mountpoint)
+		if err != nil {
+			log.Fatalf("Couldn't mount directory: %v", err)
+		}
+		defer func(mountpoint string) {
+			err := fuse.Close(mountpoint)
+			if err != nil {
+				log.Printf("Couldn't unmount directory: %v", err)
+			}
+		}(mountpoint)
+	}
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	portmapdone := make(chan struct{})
