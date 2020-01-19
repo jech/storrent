@@ -23,9 +23,22 @@ import (
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#else
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#endif
+#ifndef WINVER
+#define WINVER _WIN32_WINNT
+#endif
+#include <ws2tcpip.h>
+#include <windows.h>
+#endif
+
 #include "dht.h"
 
 void
@@ -205,7 +218,6 @@ fail:
     free(sin6s);
     return -1;
 }
-
 
 */
 import "C"
