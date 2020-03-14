@@ -1,106 +1,121 @@
-// +build cgo,!nonatpmp
-
 package portmap
 
 import (
 	"context"
-	"flag"
 	"log"
+	"net"
 	"sync"
 	"time"
 
+	"github.com/jackpal/gateway"
+	natpmp "github.com/jackpal/go-nat-pmp"
+
 	"storrent/config"
-	"storrent/natpmp"
 )
 
-var Do bool
+var clientMu sync.Mutex
+var gw net.IP
+var client *natpmp.Client
+var clientTime time.Time
 
-func init() {
-	flag.BoolVar(&Do, "portmap", true, "perform port mapping")
+func getClient() (*natpmp.Client, error) {
+	clientMu.Lock()
+	defer clientMu.Unlock()
+	if time.Since(clientTime) < time.Minute {
+		return client, nil
+	}
+	g, err := gateway.DiscoverGateway()
+	if err != nil {
+		clientTime = time.Time{}
+		gw = nil
+		client = nil
+		return nil, err
+	}
+
+	if !g.Equal(gw) {
+		gw = g
+		client = natpmp.NewClient(gw)
+	}
+	clientTime = time.Now()
+
+	return client, nil
 }
 
 func Map(ctx context.Context) error {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		err := domap(ctx, natpmp.TCP)
-		if err != nil {
-			log.Printf("Couldn't map TCP: %v", err)
-		}
+		domap(ctx, "tcp")
 		wg.Done()
 	}()
 	go func() {
-		err := domap(ctx, natpmp.UDP)
-		if err != nil {
-			log.Printf("Couldn't map UDP: %v", err)
-		}
+		domap(ctx, "udp")
 		wg.Done()
 	}()
 	wg.Wait()
 	return nil
 }
 
-func domap(ctx context.Context, proto natpmp.Protocol) error {
-	n, err := natpmp.New()
-	if err != nil {
-		return err
-	}
-	defer n.Close()
-
-	protoname := "UDP"
-	if proto == natpmp.TCP {
-		protoname = "TCP"
-	}
-
-	mapped := false
-
-	unmap := func() error {
-		_, _, err := n.Map(context.Background(),
-			proto, config.ProtocolPort,
-			config.ExternalPort(proto == natpmp.TCP, false),
-			0)
-		return err
-	}
-
-	defer func() {
-		if mapped {
-			err := unmap()
+func domap(ctx context.Context, proto string) {
+	var client *natpmp.Client
+	unmap := func() {
+		if client != nil {
+			res, err := client.AddPortMapping(
+				proto, config.ProtocolPort,
+				config.ExternalPort(proto == "tcp", false),
+				0)
 			if err != nil {
-				log.Printf("Couldn't unmap %v: %v",
-					protoname, err)
+				log.Printf("NAT-PMP: %v", err)
 			} else {
-				log.Printf("Unmapped %v", protoname)
+				log.Printf("Unmapped %v: %v->%v", proto,
+				config.ProtocolPort, res.MappedExternalPort)
 			}
 		}
-	}()
+		client = nil
+	}
+	defer unmap()
 
-	for {
-		begin := time.Now()
-		lt, port1, err := n.Map(ctx, proto, config.ProtocolPort,
-			config.ExternalPort(proto == natpmp.TCP, false),
-			30*time.Minute)
+	for ctx.Err() == nil {
+		c, err := getClient()
 		if err != nil {
-			log.Printf("Couldn't map %v: %v", protoname, err)
-			if mapped {
-				unmap()
-				mapped = false
-			}
-		} else {
-			mapped = true
-			log.Printf("Mapped %v: %v->%v, %v",
-				protoname, config.ProtocolPort, port1, lt)
-			config.SetExternalIPv4Port(port1, proto == natpmp.TCP)
+			log.Printf("NAT-PMP: %v", err)
+			unmap()
+			time.Sleep(30 * time.Second)
+			continue
 		}
-		lt /= 2
-		lt -= time.Now().Sub(begin)
-		if lt < time.Minute {
-			lt = time.Minute
+		if c != client {
+			unmap()
+			client = c
 		}
-		timer := time.NewTimer(lt)
+
+		res, err := client.AddPortMapping(
+			proto, config.ProtocolPort,
+			config.ExternalPort(proto == "tcp", false),
+			30 * 60,
+		)
+		if err != nil {
+			log.Printf("NAT-PMP: %v", err)
+			unmap()
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		log.Printf("Mapped %v: %v->%v, %v",
+			proto, config.ProtocolPort,
+			res.MappedExternalPort,
+			time.Duration(res.PortMappingLifetimeInSeconds)*
+				time.Second)
+
+		seconds := res.PortMappingLifetimeInSeconds
+		if seconds < 30 {
+			seconds = 30
+		}
+		timer := time.NewTimer(time.Duration(seconds) * time.Second *
+			2 / 3)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return nil
+			return
 		case <-timer.C:
 		}
 	}

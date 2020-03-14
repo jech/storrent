@@ -32,6 +32,7 @@ import (
 func main() {
 	var proxyURL, mountpoint string
 	var cpuprofile, memprofile, mutexprofile, tracefile string
+	var doPortmap bool
 
 	mem, err := physmem.Total()
 	if err != nil {
@@ -71,6 +72,7 @@ func main() {
 		"prefetch `rate` in bytes per second")
 	flag.IntVar(&config.DefaultEncryption, "encryption", 2,
 		"encryption `level` (0 = never, 2 = default, 5 = always)")
+	flag.BoolVar(&doPortmap, "portmap", true, "perform port mapping")
 	flag.BoolVar(&config.Debug, "debug", false,
 		"log all BitTorrent messages")
 
@@ -179,7 +181,7 @@ func main() {
 		}
 	}(portmapdone)
 
-	if portmap.Do {
+	if doPortmap {
 		go func() {
 			err := portmap.Map(ctx)
 			if err != nil {
