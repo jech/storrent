@@ -1,3 +1,5 @@
+// STorrent is a BitTorrent implementation that is optimised for streaming
+// media.
 package main
 
 import (
