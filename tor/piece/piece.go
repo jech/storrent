@@ -1,3 +1,5 @@
+// Package piece implements a data structure used for storing the actual
+// contents of a torrent.
 package piece
 
 import (
@@ -17,7 +19,7 @@ import (
 	"github.com/jech/storrent/mono"
 )
 
-// ErrHashMismatch is returned by AddData when hash validation failed.
+// ErrHashMismatch is returned by AddData when hash validation fails.
 var ErrHashMismatch = errors.New("hash mismatch")
 
 // ErrDeleted indicates that the pieces structure has been deleted.
@@ -43,6 +45,7 @@ func (p *Piece) complete() bool {
 	return p.state == stateComplete
 }
 
+// Complete returns true if the piece is complete and its hash has been verified.
 func (p *Piece) Complete() bool {
 	state := atomic.LoadUint32(&p.state)
 	return state == stateComplete
@@ -52,6 +55,7 @@ func (p *Piece) busy() bool {
 	return p.state == stateBusy
 }
 
+// Busy returns true if the piece's hash is currently being verified.
 func (p *Piece) Busy() bool {
 	state := atomic.LoadUint32(&p.state)
 	return state == stateBusy
@@ -61,6 +65,7 @@ func (p *Piece) busyOrComplete() bool {
 	return p.state != 0
 }
 
+// BusyOrComplete returns true if the piece is either busy or complete.
 func (p *Piece) BusyOrComplete() bool {
 	state := atomic.LoadUint32(&p.state)
 	return state != 0
@@ -73,14 +78,17 @@ func (p *Piece) setState(oldstate, state uint32) {
 	}
 }
 
+// Time returns the piece's access time.
 func (p *Piece) Time() mono.Time {
 	return mono.LoadAtomic(&p.time)
 }
 
+// Time sets the piece's access time.
 func (p *Piece) SetTime(tm mono.Time) {
 	mono.StoreAtomic(&p.time, tm)
 }
 
+// Pieces represents the contents of a torrent.
 type Pieces struct {
 	sync.RWMutex
 	deleted bool // torrent destroyed, don't add new data
@@ -92,18 +100,22 @@ type Pieces struct {
 	length    int64
 }
 
+// Length returns the length in bytes of a torrent's contents.
 func (ps *Pieces) Length() int64 {
 	return ps.length
 }
 
+// PieceSize returns a torrent's piece size.
 func (ps *Pieces) PieceSize() uint32 {
 	return ps.pieceSize
 }
 
+// Num returns the number of pieces in a torrent.
 func (ps *Pieces) Num() int {
 	return len(ps.pieces)
 }
 
+// Complete is called when a torrent's metadata becomes known.
 func (ps *Pieces) Complete(psize uint32, length int64) {
 	if ps.length > 0 {
 		panic("Pieces.Complete() called twice")
@@ -126,10 +138,12 @@ func (ps *Pieces) Bitmap() bitmap.Bitmap {
 	return b
 }
 
+// PieceComplete returns true if a given piece is complete.
 func (ps *Pieces) PieceComplete(n uint32) bool {
 	return ps.pieces[n].Complete()
 }
 
+// PieceEmpty returns true if no data is available for a given piece.
 func (ps *Pieces) PieceEmpty(n uint32) bool {
 	ps.RLock()
 	v := ps.pieces[n].bitmap.Empty()
@@ -137,6 +151,7 @@ func (ps *Pieces) PieceEmpty(n uint32) bool {
 	return v
 }
 
+// PieceBitmap returns a bitmap of complete pieces.
 func (ps *Pieces) PieceBitmap(n uint32) (int, bitmap.Bitmap) {
 	var v bitmap.Bitmap
 	chunks := ps.pieceChunks(n)
@@ -146,6 +161,7 @@ func (ps *Pieces) PieceBitmap(n uint32) (int, bitmap.Bitmap) {
 	return chunks, v
 }
 
+// PieceLength returns the length in bytes of a given piece.
 func (ps *Pieces) PieceLength(index uint32) uint32 {
 	last := uint32(ps.length / int64(ps.pieceSize))
 	if index < last {
@@ -161,6 +177,8 @@ func (ps *Pieces) pieceChunks(index uint32) int {
 		config.ChunkSize)
 }
 
+// ReadAt copies a range of bytes out of a torrent.  It only returns data
+// whose hash has been validated.
 func (ps *Pieces) ReadAt(p []byte, off int64) (int, error) {
 	if off >= ps.length {
 		return 0, io.EOF
@@ -179,8 +197,8 @@ func (ps *Pieces) ReadAt(p []byte, off int64) (int, error) {
 	return n, nil
 }
 
-// Update sets the timestamp of a piece to a given time.  It returns true
-// if the piece is complete.
+// Update sets the last accessed time of a piece.  It returns true if the
+// piece is complete.
 func (ps *Pieces) Update(index uint32) bool {
 	wh := mono.Now()
 
@@ -204,6 +222,7 @@ func (p *Piece) addPeer(peer uint32) {
 	p.peers = append(p.peers, peer)
 }
 
+// AddData adds data to a torrent.
 func (ps *Pieces) AddData(index uint32, begin uint32, data []byte, peer uint32) (count uint32, complete bool, err error) {
 
 	if ps.pieces[index].BusyOrComplete() {
@@ -274,6 +293,9 @@ func (ps *Pieces) AddData(index uint32, begin uint32, data []byte, peer uint32) 
 	return
 }
 
+// Finalise validates the hash of a piece and either marks it as complete
+// or discards its data.  This is a time-consuming operation, and should
+// be called from its own goroutine.
 func (ps *Pieces) Finalise(index uint32, h hash.Hash) (done bool, peers []uint32, err error) {
 	if ps.pieces[index].BusyOrComplete() {
 		return
@@ -360,6 +382,7 @@ func (ps *Pieces) del(p uint32, force bool) (done bool, complete bool) {
 	return
 }
 
+// Count returns the number of non-empty pieces.
 func (ps *Pieces) Count() int {
 	ps.RLock()
 	v := ps.count
@@ -367,6 +390,7 @@ func (ps *Pieces) Count() int {
 	return v
 }
 
+// Hole returns the size of the hole starting at a given position.
 func (ps *Pieces) Hole(index, offset uint32) (uint32, uint32) {
 	ps.RLock()
 	defer ps.RUnlock()
@@ -462,6 +486,7 @@ func (ps *Pieces) Expire(bytes int64, available []uint16, f func(index uint32)) 
 	return count
 }
 
+// Del discards the contents of a torrent from memory.
 func (ps *Pieces) Del() {
 	ps.Lock()
 	defer ps.Unlock()
