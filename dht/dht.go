@@ -1,5 +1,7 @@
 // +build cgo
 
+// Package dht provides Go bindings for libdht, a library implementing the
+// BitTorrent DHT.
 package dht
 
 import (
@@ -222,13 +224,16 @@ fail:
 */
 import "C"
 
+// Available returns true if the DHT is available in this build.
 func Available() bool {
 	return true
 }
 
+// Event is the common interface for all events returned by the DHT.
 type Event interface {
 }
 
+// A ValueEvent is returned by the DHT when values become available.
 type ValueEvent struct {
 	Hash []byte
 	IP   net.IP
@@ -283,6 +288,7 @@ func getIPv6() net.IP {
 	return addr.IP
 }
 
+// DHT starts the DHT.
 func DHT(ctx context.Context, myid []byte, port uint16) (<-chan Event, error) {
 	if len(myid) != 20 {
 		return nil, errors.New("invalid id")
@@ -429,6 +435,7 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 	}
 }
 
+// Announce announces a value in the DHT.
 func Announce(id []byte, ipv6 bool, port uint16) error {
 	if len(id) != 20 {
 		return errors.New("invalid id")
@@ -446,6 +453,7 @@ func Announce(id []byte, ipv6 bool, port uint16) error {
 	return nil
 }
 
+// Ping sends a ping message to a DHT node.
 func Ping(ip net.IP, port uint16) error {
 	ip4 := ip.To4()
 	if ip4 != nil {
@@ -460,6 +468,7 @@ func Ping(ip net.IP, port uint16) error {
 	return nil
 }
 
+// Count returns statistics about the status of the DHT.
 func Count() (good4 int, good6 int,
 	dubious4 int, dubious6 int,
 	incoming4 int, incoming6 int) {
@@ -477,6 +486,7 @@ func Count() (good4 int, good6 int,
 	return
 }
 
+// GetNodes returnes the set of known good nodes.
 func GetNodes() ([]net.TCPAddr, error) {
 	var aptr, a6ptr *C.uchar
 	var aCount, a6Count C.int
