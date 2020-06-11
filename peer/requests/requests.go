@@ -1,3 +1,5 @@
+// Package requests implements a queue of pending requests.  It is
+// optimised for frequent membership checks.
 package requests
 
 import (
@@ -16,10 +18,12 @@ type Request struct {
 	ctime time.Time // cancel time, zero if not cancelled
 }
 
+// Cancel marks a request as cancelled.
 func (r *Request) Cancel() {
 	r.ctime = time.Now()
 }
 
+// Cancelled returns true if the request was cancelled.
 func (r Request) Cancelled() bool {
 	return !r.ctime.Equal(time.Time{})
 }
@@ -32,11 +36,11 @@ func (r Request) String() string {
 	return fmt.Sprintf("[%v at %v,%v%v]", r.index, r.qtime, r.rtime, c)
 }
 
-// Requests represents a request queue with fast membership test.
+// Requests represents a request queue.
 type Requests struct {
-	queue     []Request
-	requested []Request
-	bitmap    bitmap.Bitmap
+	queue     []Request	// unsent requests
+	requested []Request	// sent requests
+	bitmap    bitmap.Bitmap	// membership
 }
 
 func (rs *Requests) String() string {
@@ -54,14 +58,19 @@ func (rs *Requests) String() string {
 	return b.String()
 }
 
+// Queue returns the number of requests queued but not sent out.
 func (rs *Requests) Queue() int {
 	return len(rs.queue)
 }
 
+// Requested returns the number of requests sent out.
 func (rs *Requests) Requested() int {
 	return len(rs.requested)
 }
 
+// Cancel cancels a request that has been sent out.  It returns two
+// booleans: the first one indicates if the request was found, the second
+// one indicates whether a Cancel should be sent out.
 func (rs *Requests) Cancel(index uint32) (bool, bool) {
 	if !rs.bitmap.Get(int(index)) {
 		return false, false
@@ -120,15 +129,19 @@ func (rs *Requests) del(index uint32, reqonly bool) (bool, bool, time.Time) {
 	return false, false, time.Time{}
 }
 
+// Del deletes a request, whether it was sent out or not.
 func (rs *Requests) Del(index uint32) (bool, bool, time.Time) {
 	return rs.del(index, false)
 }
 
+// DelRequested deletes a request only if it has been sent out.
 func (rs *Requests) DelRequested(index uint32) bool {
 	_, r, _ := rs.del(index, true)
 	return r
 }
 
+// Enqueue enqueues a new request.  It returns false if the request is
+// a duplicate.
 func (rs *Requests) Enqueue(index uint32) bool {
 	if rs.bitmap.Get(int(index)) {
 		return false
@@ -139,6 +152,7 @@ func (rs *Requests) Enqueue(index uint32) bool {
 	return true
 }
 
+// Dequeue returns the next request that should be sent out.
 func (rs *Requests) Dequeue() (request Request, index uint32) {
 	request = rs.queue[0]
 	index = request.index
@@ -150,6 +164,7 @@ func (rs *Requests) Dequeue() (request Request, index uint32) {
 	return
 }
 
+// Enqueue enqueues a request that has been sent out.
 func (rs *Requests) EnqueueRequest(r Request) {
 	if rs.bitmap.Get(int(r.index)) {
 		panic("Incorrect use of Requests.EnqueueRequest")
@@ -160,6 +175,8 @@ func (rs *Requests) EnqueueRequest(r Request) {
 	rs.requested = append(rs.requested, r)
 }
 
+// Clear cancels all queued request.  It calls the given function for all
+// requests that have already been sent out.
 func (rs *Requests) Clear(both bool, f func(uint32)) {
 	oldr := rs.requested
 	oldq := rs.queue
@@ -181,6 +198,8 @@ func (rs *Requests) Clear(both bool, f func(uint32)) {
 	}
 }
 
+// Expire clears all requests that have been cancelled before time t1 or
+// sent out before time t0.
 func (rs *Requests) Expire(t0, t1 time.Time,
 	drop func(index uint32),
 	cancel func(index uint32)) bool {
