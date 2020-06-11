@@ -1,3 +1,4 @@
+// Package rate implements a rate estimator.
 package rate
 
 import (
@@ -8,6 +9,8 @@ import (
 
 const hz float64 = 1.0 / float64(time.Second)
 
+// Estimator is a rate estimator using exponential decay.  It is not
+// thread-safe.
 type Estimator struct {
 	interval time.Duration
 	seconds  float64
@@ -17,6 +20,7 @@ type Estimator struct {
 	running  bool
 }
 
+// Init initialises a rate estimator with the given time constant.
 func (e *Estimator) Init(interval time.Duration) {
 	e.interval = interval
 	e.time = time.Now()
@@ -24,6 +28,7 @@ func (e *Estimator) Init(interval time.Duration) {
 	e.base = -1.0 / e.seconds
 }
 
+// Start starts a rate estimator.
 func (e *Estimator) Start() {
 	if !e.running {
 		e.time = time.Now()
@@ -31,10 +36,12 @@ func (e *Estimator) Start() {
 	}
 }
 
+// Stop stops a rate estimator.
 func (e *Estimator) Stop() {
 	e.running = false
 }
 
+// Time returns the time at which the estimator was advanced.
 func (e *Estimator) Time() time.Time {
 	return e.time
 }
@@ -66,6 +73,7 @@ func (e *Estimator) rate(value float64) float64 {
 	return float64(value) / e.seconds
 }
 
+// Estimate returns an estimate of the current rate.
 func (e *Estimator) Estimate() float64 {
 	if e.running {
 		e.advance(time.Now())
@@ -73,6 +81,8 @@ func (e *Estimator) Estimate() float64 {
 	return e.rate(e.value)
 }
 
+// Accumulate notifies the estimator that the given number of bytes has
+// been sent or received.
 func (e *Estimator) Accumulate(value int) {
 	if e.running {
 		now := time.Now()
@@ -81,6 +91,8 @@ func (e *Estimator) Accumulate(value int) {
 	}
 }
 
+// Allow returns true if sending or receiving the given number of bytes
+// would not exceed the given target.
 func (e *Estimator) Allow(value int, target float64) bool {
 	if (e.value+float64(value)) <= target*e.seconds {
 		return true
@@ -94,6 +106,7 @@ func (e *Estimator) Allow(value int, target float64) bool {
 	return false
 }
 
+// AtomicEstimator is a thread-save rate estimator.
 type AtomicEstimator struct {
 	sync.Mutex
 	e Estimator
