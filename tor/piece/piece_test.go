@@ -5,8 +5,8 @@ import (
 	"testing"
 	"sync/atomic"
 
-	"storrent/alloc"
-	"storrent/hash"
+	"github.com/jech/storrent/alloc"
+	"github.com/jech/storrent/hash"
 )
 
 var zeroChunkHash = hash.Hash([]byte{

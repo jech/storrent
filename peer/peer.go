@@ -11,17 +11,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"storrent/bitmap"
-	"storrent/config"
-	"storrent/crypto"
-	"storrent/dht"
-	"storrent/hash"
-	"storrent/known"
-	"storrent/peer/requests"
-	"storrent/pex"
-	"storrent/protocol"
-	"storrent/rate"
-	"storrent/tor/piece"
+	"github.com/jech/storrent/bitmap"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/crypto"
+	"github.com/jech/storrent/dht"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/known"
+	"github.com/jech/storrent/peer/requests"
+	"github.com/jech/storrent/pex"
+	"github.com/jech/storrent/protocol"
+	"github.com/jech/storrent/rate"
+	"github.com/jech/storrent/tor/piece"
 )
 
 var peerCounter uint32

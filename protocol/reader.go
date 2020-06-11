@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"storrent/config"
-	"storrent/pex"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/pex"
 )
 
 var ErrParse = errors.New("parse error")

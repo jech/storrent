@@ -16,14 +16,14 @@ import (
 	"strings"
 	"time"
 
-	"storrent/alloc"
-	"storrent/config"
-	"storrent/dht"
-	"storrent/hash"
-	"storrent/known"
-	"storrent/peer"
-	"storrent/tor"
-	"storrent/tracker"
+	"github.com/jech/storrent/alloc"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/dht"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/known"
+	"github.com/jech/storrent/peer"
+	"github.com/jech/storrent/tor"
+	"github.com/jech/storrent/tracker"
 )
 
 type handler struct {

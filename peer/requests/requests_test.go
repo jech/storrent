@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"storrent/bitmap"
+	"github.com/jech/storrent/bitmap"
 )
 
 func in(x uint32, a []uint32) bool {

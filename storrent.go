@@ -18,15 +18,15 @@ import (
 	"syscall"
 	"time"
 
-	"storrent/config"
-	"storrent/crypto"
-	"storrent/fuse"
-	thttp "storrent/http"
-	"storrent/peer"
-	"storrent/physmem"
-	"storrent/portmap"
-	"storrent/rundht"
-	"storrent/tor"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/crypto"
+	"github.com/jech/storrent/fuse"
+	thttp "github.com/jech/storrent/http"
+	"github.com/jech/storrent/peer"
+	"github.com/jech/storrent/physmem"
+	"github.com/jech/storrent/portmap"
+	"github.com/jech/storrent/rundht"
+	"github.com/jech/storrent/tor"
 )
 
 func main() {

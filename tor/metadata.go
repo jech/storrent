@@ -5,8 +5,8 @@ import (
 	"errors"
 	"sort"
 
-	"storrent/hash"
-	"storrent/peer"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/peer"
 )
 
 func metadataPeers(t *Torrent, count int) []*peer.Peer {

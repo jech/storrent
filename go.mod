@@ -1,4 +1,4 @@
-module storrent
+module github.com/jech/storrent
 
 go 1.13
 

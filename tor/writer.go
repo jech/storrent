@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"storrent/peer"
+	"github.com/jech/storrent/peer"
 )
 
 var errClosedWriter = errors.New("closed writer")

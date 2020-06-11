@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"storrent/rate"
+	"github.com/jech/storrent/rate"
 )
 
 type Webseed interface {

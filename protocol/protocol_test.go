@@ -15,9 +15,9 @@ import (
 	"sync"
 	"testing"
 
-	"storrent/crypto"
-	"storrent/hash"
-	"storrent/pex"
+	"github.com/jech/storrent/crypto"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/pex"
 )
 
 func randomHash() hash.Hash {

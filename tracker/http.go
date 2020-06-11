@@ -11,7 +11,7 @@ import (
 
 	"github.com/zeebo/bencode"
 
-	"storrent/httpclient"
+	"github.com/jech/storrent/httpclient"
 )
 
 type HTTP struct {

@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
-	"storrent/crypto"
-	"storrent/hash"
+	"github.com/jech/storrent/crypto"
+	"github.com/jech/storrent/hash"
 )
 
 type HandshakeResult struct {

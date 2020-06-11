@@ -10,7 +10,7 @@ import (
 	"github.com/jackpal/gateway"
 	natpmp "github.com/jackpal/go-nat-pmp"
 
-	"storrent/config"
+	"github.com/jech/storrent/config"
 )
 
 var clientMu sync.Mutex

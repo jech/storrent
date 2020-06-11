@@ -4,7 +4,7 @@ import (
 	"net"
 	"time"
 
-	"storrent/hash"
+	"github.com/jech/storrent/hash"
 )
 
 type Peer struct {

@@ -9,7 +9,7 @@ import (
 	nurl "net/url"
 	"strconv"
 
-	"storrent/httpclient"
+	"github.com/jech/storrent/httpclient"
 )
 
 type Hoffman struct {

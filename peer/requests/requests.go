@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"storrent/bitmap"
+	"github.com/jech/storrent/bitmap"
 )
 
 // Request represents an outgoing request.

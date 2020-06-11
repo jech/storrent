@@ -3,7 +3,7 @@ package config
 import (
 	"sync/atomic"
 
-	"storrent/hash"
+	"github.com/jech/storrent/hash"
 )
 
 var ProtocolPort int

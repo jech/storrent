@@ -6,7 +6,7 @@ import (
 	"io"
 	"runtime"
 
-	"storrent/config"
+	"github.com/jech/storrent/config"
 )
 
 var errClosedReader = errors.New("closed reader")

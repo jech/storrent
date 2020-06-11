@@ -3,7 +3,7 @@ package tor
 import (
 	"bytes"
 	"sync"
-	"storrent/hash"
+	"github.com/jech/storrent/hash"
 )
 
 var torrents sync.Map

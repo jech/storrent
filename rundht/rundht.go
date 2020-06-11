@@ -13,12 +13,12 @@ import (
 
 	"github.com/zeebo/bencode"
 
-	"storrent/config"
-	"storrent/dht"
-	"storrent/hash"
-	"storrent/known"
-	"storrent/pex"
-	"storrent/tor"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/dht"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/known"
+	"github.com/jech/storrent/pex"
+	"github.com/jech/storrent/tor"
 )
 
 func init() {

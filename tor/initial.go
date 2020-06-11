@@ -9,10 +9,10 @@ import (
 
 	"golang.org/x/net/proxy"
 
-	"storrent/config"
-	"storrent/crypto"
-	"storrent/known"
-	"storrent/protocol"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/crypto"
+	"github.com/jech/storrent/known"
+	"github.com/jech/storrent/protocol"
 )
 
 var ErrMartianAddress = errors.New("martian address")

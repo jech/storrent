@@ -10,11 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"storrent/alloc"
-	"storrent/bitmap"
-	"storrent/config"
-	"storrent/hash"
-	"storrent/mono"
+	"github.com/jech/storrent/alloc"
+	"github.com/jech/storrent/bitmap"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/mono"
 )
 
 // ErrHashMismatch is returned by AddData when hash validation failed.

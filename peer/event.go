@@ -4,10 +4,10 @@ import (
 	"net"
 	"time"
 
-	"storrent/bitmap"
-	"storrent/hash"
-	"storrent/known"
-	"storrent/pex"
+	"github.com/jech/storrent/bitmap"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/known"
+	"github.com/jech/storrent/pex"
 )
 
 type TorEvent interface{}

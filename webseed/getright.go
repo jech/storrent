@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"storrent/httpclient"
+	"github.com/jech/storrent/httpclient"
 )
 
 type GetRight struct {

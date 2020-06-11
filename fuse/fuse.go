@@ -15,8 +15,8 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 
-	"storrent/hash"
-	"storrent/tor"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/tor"
 )
 
 func Serve(mountpoint string) error {

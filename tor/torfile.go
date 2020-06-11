@@ -12,11 +12,11 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"storrent/config"
-	"storrent/hash"
-	"storrent/httpclient"
-	"storrent/tracker"
-	"storrent/webseed"
+	"github.com/jech/storrent/config"
+	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/httpclient"
+	"github.com/jech/storrent/tracker"
+	"github.com/jech/storrent/webseed"
 )
 
 type BTorrent struct {

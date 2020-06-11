@@ -3,9 +3,9 @@ package protocol
 import (
 	"net"
 
-	"storrent/pex"
-
 	"github.com/zeebo/bencode"
+
+	"github.com/jech/storrent/pex"
 )
 
 const (

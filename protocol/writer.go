@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"storrent/pex"
+	"github.com/jech/storrent/pex"
 )
 
 func formatUint32(b []byte, v uint32) []byte {
