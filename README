@@ -1,0 +1,54 @@
+Storrent
+========
+
+Storrent is a BitTorrent implementation that is optimised for streaming
+media: it allows you to watch a movie or to listen to music from a Torrent
+without downloading it entirely.
+
+Storrent works entirely in RAM: except for the DHT database, it will never
+write anything to disk.  It requires a fair amount of memory (1GB will do,
+4GB is better).
+
+Storrent was written for my own needs.  It might or might not fit yours;
+please do not get offended if I don't listen to your feature requests.
+
+
+Installation
+------------
+
+    go install github.com/jech/storrent
+
+
+Running
+-------
+
+    storrent &
+      
+Now go to
+
+    http://localhost:8088
+    
+and add a magnet link or a link to a torrent file.  Wait a few minutes,
+then hit reload; you should see a link to a playlist which you should
+download and feed to your favourite media player.
+
+
+Command-line options
+--------------------
+
+    storrent -help
+    
+By default, storrent takes 1/2 of the total RAM on your machine.  You may
+tune this with the `-mem` command-line flag:
+
+    storrent -mem $((4 * 1024 * 1024)) &
+    
+I usually run storrent in a slightly more paranoid mode than the default:
+
+    storrent -encryption 5 -dht-passive
+    
+
+Author
+------
+
+Juliusz Chroboczek <https://www.irif.fr/~jch/>
