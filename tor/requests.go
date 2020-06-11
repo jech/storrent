@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// IdlePriority is returned for pieces that have been requested for
+// reasons other than a client requiring them.
 const IdlePriority = int8(math.MinInt8)
 
 type RequestedPiece struct {
@@ -12,11 +14,15 @@ type RequestedPiece struct {
 	done chan struct{}
 }
 
+// Requested is a set of pieces that are requested for a torrent.
 type Requested struct {
 	pieces map[uint32]*RequestedPiece
 	time   time.Time
 }
 
+// Add adds a piece to a set of requested pieces.  It returns a channel
+// that will be closed when the piece is complete, as well as a boolean
+// that indicates if the priority of the piece has been increased.
 func (rs *Requested) Add(index uint32, prio int8, want bool) (<-chan struct{}, bool) {
 	added := false
 	r := rs.pieces[index]
@@ -44,6 +50,8 @@ func (rs *Requested) del(index uint32) {
 	delete(rs.pieces, index)
 }
 
+// Del deletes a request for a piece.  It returns true if the piece has
+// been cancelled (no other clients are requesting this piece).
 func (rs *Requested) Del(index uint32, prio int8) bool {
 	r := rs.pieces[index]
 	if r == nil {
@@ -62,6 +70,7 @@ func (rs *Requested) Del(index uint32, prio int8) bool {
 	return false
 }
 
+// Count counts the number of request pieces that satisfy a given predicate.
 func (rs *Requested) Count(f func(uint32) bool) int {
 	count := 0
 	for i := range rs.pieces {
@@ -84,6 +93,7 @@ func hasPriority(r *RequestedPiece, prio int8) bool {
 	return false
 }
 
+// Done is called to indicate that a piece has finished downloading.
 func (rs *Requested) Done(index uint32) {
 	r := rs.pieces[index]
 	if r == nil {
@@ -98,12 +108,15 @@ func (rs *Requested) Done(index uint32) {
 	rs.DelIdlePiece(index)
 }
 
+// DelIdle cancels all pieces that are not currently requested by any client.
 func (rs *Requested) DelIdle() {
 	for index := range rs.pieces {
 		rs.DelIdlePiece(index)
 	}
 }
 
+// DelIdlePiece deletes a given piece only if it is not currently
+// requested by a client.
 func (rs *Requested) DelIdlePiece(index uint32) {
 	r := rs.pieces[index]
 	if r == nil {
