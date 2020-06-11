@@ -1,5 +1,5 @@
-// Package bitmap implements bitmaps that maintain their length modulo 8,
-// and are therefore compatible with BitTorrent bitfields.
+// Package bitmap implements bitmaps that maintain their length in bytes
+// and behave compatibly with the bitfields used in the BitTorrent protocol.
 package bitmap
 
 import (
@@ -58,6 +58,7 @@ func (b *Bitmap) Reset(i int) {
 	(*b)[i>>3] &= ^(1 << (7 - uint8(i&7)))
 }
 
+// Copy copies a bitmap.
 func (b Bitmap) Copy() Bitmap {
 	if b == nil {
 		return nil
@@ -168,6 +169,9 @@ func (b1 Bitmap) EqualValue(b2 Bitmap) bool {
 	return true
 }
 
+// Range applies a given function on all set values in a bitmap in
+// increasing order.  The iteration is interrupted when the function
+// returns false.
 func (b Bitmap) Range(f func(index int) bool) {
 	for i, v := range b {
 		if v == 0 {
