@@ -1,25 +1,30 @@
+// Package PEX implements the data structures used by BitTorrent peer exchange.
 package pex
 
 import (
 	"net"
 )
 
+// Peer represents a peer known or announced over PEX.
 type Peer struct {
 	IP    net.IP
 	Port  int
 	Flags byte
 }
 
+// PEX flags
 const (
 	Encrypt    = 0x01
 	UploadOnly = 0x02
 	Outgoing   = 0x10
 )
 
+// Equal returns true if two peers have the same socket address.
 func (p Peer) Equal(q Peer) bool {
 	return p.IP.Equal(q.IP) && q.Port == q.Port
 }
 
+// Find find a peer in a list of peers.
 func Find(p Peer, l []Peer) int {
 	for i, q := range l {
 		if p.Equal(q) {
@@ -29,6 +34,7 @@ func Find(p Peer, l []Peer) int {
 	return -1
 }
 
+// ParseCompact parses a list of PEX peers in compact format.
 func ParseCompact(data []byte, flags []byte, ipv6 bool) []Peer {
 	l := 4
 	if ipv6 {
@@ -56,6 +62,7 @@ func ParseCompact(data []byte, flags []byte, ipv6 bool) []Peer {
 	return peers
 }
 
+// FormatCompact formats a list of PEX peers in compact format.
 func FormatCompact(peers []Peer) (ipv4 []byte, flags4 []byte, ipv6 []byte, flags6 []byte) {
 	for _, peer := range peers {
 		v4 := peer.IP.To4()
