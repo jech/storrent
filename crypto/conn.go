@@ -9,12 +9,18 @@ import (
 )
 
 type Conn struct {
-	conn     net.Conn
-	enc, dec *rc4.Cipher
-	sync.Mutex
+	conn net.Conn
+
+	readmu sync.Mutex
+	dec    *rc4.Cipher
+
+	writemu sync.Mutex
+	enc     *rc4.Cipher
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
+	c.readmu.Lock()
+	defer c.readmu.Unlock()
 	n, err = c.conn.Read(b)
 	c.dec.XORKeyStream(b[:n], b[:n])
 	return
@@ -29,9 +35,9 @@ var pool sync.Pool = sync.Pool{
 
 func (c *Conn) Write(b []byte) (n int, err error) {
 	buf := pool.Get().([]byte)
-	c.Lock()
+	c.writemu.Lock()
 	defer func() {
-		c.Unlock()
+		c.writemu.Unlock()
 		pool.Put(buf)
 	}()
 
