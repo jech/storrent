@@ -49,7 +49,7 @@ func MemoryLowMark() int64 {
 
 const ChunkSize uint32 = 16 * 1024
 
-var uploadRate uint32 = 256 * 1024
+var uploadRate uint32 = 512 * 1024
 
 func UploadRate() float64 {
 	return float64(atomic.LoadUint32(&uploadRate))
