@@ -19,6 +19,7 @@ import (
 	"github.com/jech/storrent/webseed"
 )
 
+// BTorrent stores the contents of a torrent file.
 type BTorrent struct {
 	Info         bencode.RawMessage `bencode:"info"`
 	CreationDate int64              `bencode:"creation date,omitempty"`
@@ -28,6 +29,7 @@ type BTorrent struct {
 	HTTPSeeds    listOrString       `bencode:"httpseeds,omitempty"`
 }
 
+// BInfo is the info dictionary of a torrent file.
 type BInfo struct {
 	Name        string  `bencode:"name"`
 	Name8       string  `bencode:"name.utf-8,omitempty"`
@@ -37,6 +39,7 @@ type BInfo struct {
 	Files       []BFile `bencode:"files,omitempty"`
 }
 
+// BFile is a file entry in a torrent file.
 type BFile struct {
 	Path   []string `bencode:"path"`
 	Path8  []string `bencode:"path.utf-8,omitempty"`
@@ -44,7 +47,8 @@ type BFile struct {
 	Attr   string   `bencode:"attr,omitempty"`
 }
 
-// Always encodes as a list
+// listOrString is an array of strings.  It may unmarshal from either
+// a list or a singleton string, and always encodes to a list.
 type listOrString []string
 
 func (ls *listOrString) UnmarshalBencode(v []byte) error {
@@ -98,6 +102,7 @@ func (e ParseURLError) Unwrap() error {
 	return e.Err
 }
 
+// GetTorrent fetches a torrent file from a web server.
 func GetTorrent(ctx context.Context, proxy string, url string) (*Torrent, error) {
 	u, err := nurl.Parse(url)
 	if err == nil && u.Scheme != "http" && u.Scheme != "https" {
@@ -136,6 +141,8 @@ func GetTorrent(ctx context.Context, proxy string, url string) (*Torrent, error)
 	return t, nil
 }
 
+// ReadTorrent reads a torrent from an io.Reader.  The given proxy will be
+// used when accessing trackers for this torrent.
 func ReadTorrent(proxy string, r io.Reader) (*Torrent, error) {
 	decoder := bencode.NewDecoder(r)
 	var torrent BTorrent
@@ -187,6 +194,7 @@ func ReadTorrent(proxy string, r io.Reader) (*Torrent, error) {
 	return t, nil
 }
 
+// MetadataComplete must be called when a torrent's metadata is complete.
 func (torrent *Torrent) MetadataComplete() error {
 	var info BInfo
 	err := bencode.DecodeBytes(torrent.Info, &info)
@@ -260,6 +268,7 @@ func (torrent *Torrent) MetadataComplete() error {
 	return nil
 }
 
+// ReadMagnet parses a magnet link.
 func ReadMagnet(proxy string, m string) (*Torrent, error) {
 	h := hash.Parse(m)
 	var dn string
@@ -307,6 +316,7 @@ func ReadMagnet(proxy string, m string) (*Torrent, error) {
 	return New(proxy, h, dn, nil, 0, announce, webseeds)
 }
 
+// WriteTorrent writes a torrent file to an io.Writer.
 func WriteTorrent(w io.Writer, t *Torrent) error {
 	encoder := bencode.NewEncoder(w)
 	var a string
