@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
@@ -207,6 +208,8 @@ func main() {
 	}
 	defer func() {
 		if config.DHTBootstrap != "" {
+			dir := filepath.Dir(config.DHTBootstrap)
+			os.MkdirAll(dir, 0700) // ignore errors
 			err := rundht.Write(config.DHTBootstrap, id)
 			if err != nil {
 				log.Printf("Couldn't write %v: %v",

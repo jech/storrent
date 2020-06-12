@@ -6,9 +6,10 @@ import (
 	"context"
 	"flag"
 	"log"
+	"math/rand"
 	"net"
 	"os"
-	"math/rand"
+	"path/filepath"
 	"time"
 
 	"github.com/zeebo/bencode"
@@ -22,9 +23,20 @@ import (
 )
 
 func init() {
+	dhtFile := ""
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		log.Printf("Couldn't determine config dir: %v", err)
+	} else {
+		dhtFile = filepath.Join(
+			filepath.Join(configDir, "storrent"),
+			"dht.dat",
+		)
+	}
+
 	flag.BoolVar(&config.DefaultUseDht, "use-dht", true,
 		"use the DHT by default")
-	flag.StringVar(&config.DHTBootstrap, "dht", "dht.dat",
+	flag.StringVar(&config.DHTBootstrap, "dht", dhtFile,
 		"DHT bootstrap `file`")
 }
 
