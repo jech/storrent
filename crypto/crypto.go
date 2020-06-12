@@ -1,3 +1,4 @@
+// Package crypto implements BitTorrent protocol encryption.
 package crypto
 
 import (
@@ -20,6 +21,7 @@ type Options struct {
 	ForceEncryption       bool
 }
 
+// OptionsMap maps an integer command-line argument to a set of Options.
 var OptionsMap = map[int]*Options{
 	0: &Options{},
 	1: &Options{
@@ -186,6 +188,9 @@ func trivial(x *big.Int) bool {
 	return x.Cmp(&zero) == 0 || x.Cmp(&one) == 0 || x.Cmp(&p1) == 0
 }
 
+// ClientHandshake performs the client side of the BitTorrent protocol
+// encryption handshake.  It returns an encrypted connection and any
+// cleartext that was received together with the handshake.
 func ClientHandshake(c net.Conn, skey []byte, ia []byte, options *Options) (conn net.Conn, buf []byte, err error) {
 
 	conn = c
@@ -335,6 +340,10 @@ func ClientHandshake(c net.Conn, skey []byte, ia []byte, options *Options) (conn
 	}
 }
 
+// ClientHandshake performs the server side of the BitTorrent protocol
+// encryption handshake.  It returns an encrypted connection, the skey
+// that was agreed upon (a torrent hash), and any cleartext that was
+// included within the handshake.
 func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) (conn net.Conn, skey []byte, ia []byte, err error) {
 	conn = c
 

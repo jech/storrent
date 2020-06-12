@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// Conn is an encrypted connexion.  It implements the net.Conn interface.
 type Conn struct {
 	conn net.Conn
 
