@@ -90,7 +90,7 @@ func (p *Piece) SetTime(tm mono.Time) {
 
 // Pieces represents the contents of a torrent.
 type Pieces struct {
-	sync.RWMutex
+	mu      sync.RWMutex
 	deleted bool // torrent destroyed, don't add new data
 	pieces  []Piece
 	count   int // count of non-empty pieces
@@ -128,8 +128,8 @@ func (ps *Pieces) Complete(psize uint32, length int64) {
 // Bitmap returns the a bitmap with a bit set for each complete piece.
 func (ps *Pieces) Bitmap() bitmap.Bitmap {
 	b := bitmap.New(len(ps.pieces))
-	ps.RLock()
-	defer ps.RUnlock()
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
 	for i, p := range ps.pieces {
 		if p.complete() {
 			b.Set(i)
@@ -145,19 +145,18 @@ func (ps *Pieces) PieceComplete(n uint32) bool {
 
 // PieceEmpty returns true if no data is available for a given piece.
 func (ps *Pieces) PieceEmpty(n uint32) bool {
-	ps.RLock()
-	v := ps.pieces[n].bitmap.Empty()
-	ps.RUnlock()
-	return v
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.pieces[n].bitmap.Empty()
 }
 
 // PieceBitmap returns a bitmap of complete pieces.
 func (ps *Pieces) PieceBitmap(n uint32) (int, bitmap.Bitmap) {
 	var v bitmap.Bitmap
 	chunks := ps.pieceChunks(n)
-	ps.RLock()
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
 	v = ps.pieces[n].bitmap.Copy()
-	ps.RUnlock()
 	return chunks, v
 }
 
@@ -186,8 +185,8 @@ func (ps *Pieces) ReadAt(p []byte, off int64) (int, error) {
 	index := int(off / int64(ps.pieceSize))
 	begin := int(off % int64(ps.pieceSize))
 
-	ps.RLock()
-	defer ps.RUnlock()
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
 
 	if !ps.pieces[index].complete() || len(ps.pieces[index].data) <= begin {
 		return 0, nil
@@ -229,8 +228,8 @@ func (ps *Pieces) AddData(index uint32, begin uint32, data []byte, peer uint32) 
 		return
 	}
 
-	ps.Lock()
-	defer ps.Unlock()
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
 
 	// test again
 	if ps.pieces[index].busyOrComplete() {
@@ -301,8 +300,8 @@ func (ps *Pieces) Finalise(index uint32, h hash.Hash) (done bool, peers []uint32
 		return
 	}
 
-	ps.Lock()
-	defer ps.Unlock()
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
 
 	// test again
 	if ps.pieces[index].busyOrComplete() {
@@ -321,12 +320,12 @@ func (ps *Pieces) Finalise(index uint32, h hash.Hash) (done bool, peers []uint32
 	data := ps.pieces[index].data
 
 	ps.pieces[index].setState(0, stateBusy)
-	ps.Unlock()
+	ps.mu.Unlock()
 
 	hsh := sha1.Sum(data)
 	hh := hash.Hash(hsh[:])
 
-	ps.Lock()
+	ps.mu.Lock()
 	peers = ps.pieces[index].peers
 	ps.pieces[index].peers = nil
 	if !hh.Equals(h) {
@@ -350,7 +349,7 @@ func (ps *Pieces) del(p uint32, force bool) (done bool, complete bool) {
 		if !force {
 			return
 		}
-		ps.Unlock()
+		ps.mu.Unlock()
 		t := 10 * time.Microsecond
 		for ps.pieces[p].Busy() {
 			time.Sleep(t)
@@ -358,7 +357,7 @@ func (ps *Pieces) del(p uint32, force bool) (done bool, complete bool) {
 				t = t * 2
 			}
 		}
-		ps.Lock()
+		ps.mu.Lock()
 	}
 
 	done = true
@@ -384,16 +383,15 @@ func (ps *Pieces) del(p uint32, force bool) (done bool, complete bool) {
 
 // Count returns the number of non-empty pieces.
 func (ps *Pieces) Count() int {
-	ps.RLock()
-	v := ps.count
-	ps.RUnlock()
-	return v
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.count
 }
 
 // Hole returns the size of the hole starting at a given position.
 func (ps *Pieces) Hole(index, offset uint32) (uint32, uint32) {
-	ps.RLock()
-	defer ps.RUnlock()
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
 	p := ps.pieces[index]
 	if p.busyOrComplete() {
 		return ^uint32(0), ^uint32(0)
@@ -426,8 +424,8 @@ func (ps *Pieces) Hole(index, offset uint32) (uint32, uint32) {
 
 // Bytes returns an overestimate the amount of memory used up by ps.
 func (ps *Pieces) Bytes() int64 {
-	ps.Lock()
-	defer ps.Unlock()
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
 	return int64(ps.count) * int64(ps.pieceSize)
 }
 
@@ -472,9 +470,9 @@ func (ps *Pieces) Expire(bytes int64, available []uint16, f func(index uint32)) 
 		if todo <= 0 {
 			break
 		}
-		ps.Lock()
+		ps.mu.Lock()
 		done, complete := ps.del(index, false)
-		ps.Unlock()
+		ps.mu.Unlock()
 		if done {
 			if complete {
 				f(index)
@@ -488,8 +486,8 @@ func (ps *Pieces) Expire(bytes int64, available []uint16, f func(index uint32)) 
 
 // Del discards the contents of a torrent from memory.
 func (ps *Pieces) Del() {
-	ps.Lock()
-	defer ps.Unlock()
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
 	for i := uint32(0); i < uint32(len(ps.pieces)); i++ {
 		ps.del(i, true)
 	}

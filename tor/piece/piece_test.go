@@ -174,9 +174,9 @@ func BenchmarkAddDel(b *testing.B) {
 				b.Errorf("AddData: %v", err)
 			}
 			if complete {
-				ps.Lock()
+				ps.mu.Lock()
 				ps.del(index, true)
-				ps.Unlock()
+				ps.mu.Unlock()
 			}
 		}
 	})
