@@ -178,7 +178,7 @@ func ReadTorrent(proxy string, r io.Reader) (*Torrent, error) {
 		return nil, err
 	}
 
-	err = t.Complete()
+	err = t.MetadataComplete()
 	if err != nil {
 		t.Kill(context.Background())
 		return nil, err
@@ -187,7 +187,7 @@ func ReadTorrent(proxy string, r io.Reader) (*Torrent, error) {
 	return t, nil
 }
 
-func (torrent *Torrent) Complete() error {
+func (torrent *Torrent) MetadataComplete() error {
 	var info BInfo
 	err := bencode.DecodeBytes(torrent.Info, &info)
 	if err != nil {
@@ -252,7 +252,7 @@ func (torrent *Torrent) Complete() error {
 	if torrent.Name == "" {
 		return errors.New("torrent has no name")
 	}
-	torrent.Pieces.Complete(info.PieceLength, length)
+	torrent.Pieces.MetadataComplete(info.PieceLength, length)
 	torrent.Files = files
 
 	atomic.StoreUint32(&torrent.infoComplete, 1)

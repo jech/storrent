@@ -661,7 +661,7 @@ func requestPiece(t *Torrent, index uint32, prio int8, request bool, want bool) 
 	var done <-chan struct{}
 	added := false
 	if request {
-		if t.Pieces.PieceComplete(index) {
+		if t.Pieces.Complete(index) {
 			want = false
 		}
 		done, added = t.requested.Add(index, prio, want)
@@ -723,7 +723,7 @@ func getChunks(t *Torrent, prio int8, max int) ([]chunk, []uint32) {
 	maxIF := maxInFlight(prio)
 outer:
 	for index, r := range t.requested.pieces {
-		if !hasPriority(r, prio) || t.Pieces.PieceComplete(index) {
+		if !hasPriority(r, prio) || t.Pieces.Complete(index) {
 			continue
 		}
 		if available(t, index) <= 0 {
@@ -821,7 +821,7 @@ func periodicRequest(ctx context.Context, t *Torrent) {
 		}
 		incomplete :=
 			t.requested.Count(func(index uint32) bool {
-				return !t.Pieces.PieceComplete(index)
+				return !t.Pieces.Complete(index)
 			})
 		if incomplete < count {
 			pickIdlePieces(t, count-incomplete)
@@ -1161,7 +1161,7 @@ func inFlight(t *Torrent, index uint32) uint8 {
 func pickPriority(t *Torrent) int8 {
 	prio := IdlePriority
 	for index, r := range t.requested.pieces {
-		if t.Pieces.PieceComplete(index) ||
+		if t.Pieces.Complete(index) ||
 			(!hasWebseeds(t) && available(t, index) == 0) {
 			continue
 		}
@@ -1191,8 +1191,8 @@ func pickIdlePieces(t *Torrent, count int) {
 		p1 := uint32(ps[i])
 		p2 := uint32(ps[j])
 		// complete pieces last
-		c1 := t.Pieces.PieceComplete(p1)
-		c2 := t.Pieces.PieceComplete(p2)
+		c1 := t.Pieces.Complete(p1)
+		c2 := t.Pieces.Complete(p2)
 		if !c1 && c2 {
 			return true
 		} else if c1 && !c2 {
@@ -1264,7 +1264,7 @@ func pickIdlePieces(t *Torrent, count int) {
 
 	// pick incomplete piece
 	for _, pn := range ps {
-		if t.Pieces.PieceComplete(uint32(pn)) ||
+		if t.Pieces.Complete(uint32(pn)) ||
 			t.Pieces.PieceEmpty(uint32(pn)) {
 			break
 		}
@@ -1283,7 +1283,7 @@ func pickIdlePieces(t *Torrent, count int) {
 		for _, p := range t.peers {
 			fast := p.GetFast()
 			for _, i := range fast {
-				if !t.Pieces.PieceComplete(i) && p.GetHave(i) {
+				if !t.Pieces.Complete(i) && p.GetHave(i) {
 					if add(i) {
 						return
 					}
@@ -1293,7 +1293,7 @@ func pickIdlePieces(t *Torrent, count int) {
 	}
 
 	for _, pn := range ps {
-		if t.Pieces.PieceComplete(uint32(pn)) {
+		if t.Pieces.Complete(uint32(pn)) {
 			break
 		}
 		if available(t, uint32(pn)) > 0 || hasWebseeds(t) {
@@ -1439,7 +1439,7 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 		err := writePeer(interested[0], peer.PeerUnchoke{true})
 		if err == nil {
 			n++
-			if(opportunistic) {
+			if opportunistic {
 				return
 			}
 		}
@@ -1727,7 +1727,7 @@ func (t *Torrent) Request(index uint32, prio int8, request bool, want bool) (boo
 	}
 
 	if request {
-		complete := t.Pieces.Update(index)
+		complete := t.Pieces.UpdateTime(index)
 		if complete {
 			return false, nil, nil
 		}

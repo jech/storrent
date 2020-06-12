@@ -20,7 +20,7 @@ var zeroHash = hash.Hash([]byte{
 
 func TestPieces(t *testing.T) {
 	ps := &Pieces{}
-	ps.Complete(256*1024, 10*256*1024+133*1024)
+	ps.MetadataComplete(256*1024, 10*256*1024+133*1024)
 	defer func() {
 		ps.Del()
 		if a := alloc.Bytes(); a != 0 {
@@ -78,7 +78,7 @@ func TestPieces(t *testing.T) {
 	if count != 16384 || complete || err != nil {
 		t.Errorf("Adddata: %v %v %v", count, complete, err)
 	}
-	if ps.PieceComplete(1) {
+	if ps.Complete(1) {
 		t.Errorf("Piece is complete")
 	}
 	if _, bm := ps.PieceBitmap(1); bm.Count() != 1 {
@@ -94,7 +94,7 @@ func TestPieces(t *testing.T) {
 	if count != 256*1024-16384 || !complete || err != nil {
 		t.Errorf("Adddata: %v %v %v", count, complete, err)
 	}
-	if ps.PieceComplete(1) {
+	if ps.Complete(1) {
 		t.Errorf("Piece is complete")
 	}
 	if _, bm := ps.PieceBitmap(1); bm.Count() != 256/16 {
@@ -115,7 +115,7 @@ func TestPieces(t *testing.T) {
 	if !done || len(peers) != 2 || err != nil {
 		t.Errorf("Finalise: %v %v", done, err)
 	}
-	if !ps.PieceComplete(1) {
+	if !ps.Complete(1) {
 		t.Errorf("Piece is not complete")
 	}
 
@@ -160,7 +160,7 @@ func BenchmarkAddDel(b *testing.B) {
 	ps := &Pieces{}
 	chunk := make([]byte, 16 * 1024)
 	chunks := uint32(4096)
-	ps.Complete(256*1024, int64(chunks) * 16 * 1024)
+	ps.MetadataComplete(256*1024, int64(chunks) * 16 * 1024)
 	counter := uint32(0)
 	b.SetBytes(16 * 1024)
 	b.RunParallel(func(pb *testing.PB) {
@@ -191,7 +191,7 @@ func BenchmarkAddFinalise(b *testing.B) {
 	ps := &Pieces{}
 	chunk := make([]byte, 16 * 1024)
 	chunks := uint32(4096)
-	ps.Complete(256*1024, int64(chunks) * 16 * 1024)
+	ps.MetadataComplete(256*1024, int64(chunks) * 16 * 1024)
 	counter := uint32(0)
 	b.SetBytes(16 * 1024)
 	b.RunParallel(func(pb *testing.PB) {
@@ -222,7 +222,7 @@ func BenchmarkAddFinalise(b *testing.B) {
 func prepare(chunks uint32) (*Pieces, error) {
 	ps := &Pieces{}
 	chunk := make([]byte, 16 * 1024)
-	ps.Complete(256*1024, int64(chunks) * 16 * 1024)
+	ps.MetadataComplete(256*1024, int64(chunks) * 16 * 1024)
 
 	for n := uint32(0); n < chunks; n++ {
 		index := n / (256 / 16)
@@ -283,7 +283,7 @@ func BenchmarkReadUpdate(b *testing.B) {
 		buf := make([]byte, 16384)
 		n := uint32(0)
 		for pb.Next() {
-			complete := ps.Update(n / (256 / 16))
+			complete := ps.UpdateTime(n / (256 / 16))
 			if !complete {
 				b.Errorf("Update: %v", complete)
 			}

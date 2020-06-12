@@ -159,7 +159,7 @@ func gotMetadata(t *Torrent, index, size uint32, data []byte) (bool, error) {
 		t.infoRequested = nil
 		return false, errors.New("hash mismatch")
 	}
-	err := t.Complete()
+	err := t.MetadataComplete()
 	if err != nil {
 		t.Info = nil
 		t.infoBitmap = nil

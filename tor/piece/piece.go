@@ -88,6 +88,18 @@ func (p *Piece) SetTime(tm mono.Time) {
 	mono.StoreAtomic(&p.time, tm)
 }
 
+// Update sets the last accessed time of a piece.  It returns true if the
+// piece is complete.
+func (ps *Pieces) UpdateTime(index uint32) bool {
+	wh := mono.Now()
+
+	if ps.pieces[index].Time().Before(wh) {
+		ps.pieces[index].SetTime(wh)
+	}
+
+	return ps.pieces[index].Complete()
+}
+
 // Pieces represents the contents of a torrent.
 type Pieces struct {
 	mu      sync.RWMutex
@@ -115,8 +127,8 @@ func (ps *Pieces) Num() int {
 	return len(ps.pieces)
 }
 
-// Complete is called when a torrent's metadata becomes known.
-func (ps *Pieces) Complete(psize uint32, length int64) {
+// MetadataComplete must be called when a torrent's metadata becomes known.
+func (ps *Pieces) MetadataComplete(psize uint32, length int64) {
 	if ps.length > 0 {
 		panic("Pieces.Complete() called twice")
 	}
@@ -138,8 +150,8 @@ func (ps *Pieces) Bitmap() bitmap.Bitmap {
 	return b
 }
 
-// PieceComplete returns true if a given piece is complete.
-func (ps *Pieces) PieceComplete(n uint32) bool {
+// Complete returns true if a given piece is complete.
+func (ps *Pieces) Complete(n uint32) bool {
 	return ps.pieces[n].Complete()
 }
 
@@ -194,18 +206,6 @@ func (ps *Pieces) ReadAt(p []byte, off int64) (int, error) {
 
 	n := copy(p, ps.pieces[index].data[begin:])
 	return n, nil
-}
-
-// Update sets the last accessed time of a piece.  It returns true if the
-// piece is complete.
-func (ps *Pieces) Update(index uint32) bool {
-	wh := mono.Now()
-
-	if ps.pieces[index].Time().Before(wh) {
-		ps.pieces[index].SetTime(wh)
-	}
-
-	return ps.pieces[index].Complete()
 }
 
 func (p *Piece) addPeer(peer uint32) {
