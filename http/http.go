@@ -40,6 +40,11 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// The server is only bound to localhost, but an attacker might be
+	// able to cause the user's browser to connect to localhost by
+	// manipulating the DNS.  Prevent this by making sure that the
+	// browser thinks it's connecting to localhost.
 	if host != "localhost" && net.ParseIP(host) == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
