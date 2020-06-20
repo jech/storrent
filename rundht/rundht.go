@@ -35,9 +35,9 @@ func init() {
 	}
 
 	flag.BoolVar(&config.DefaultUseDht, "use-dht", true,
-		"use the DHT by default")
+		"Use the DHT by default.")
 	flag.StringVar(&config.DHTBootstrap, "dht", dhtFile,
-		"DHT bootstrap `file`")
+		"DHT bootstrap `file`.")
 }
 
 type BDHT struct {
