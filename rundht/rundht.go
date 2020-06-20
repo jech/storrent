@@ -1,5 +1,7 @@
 // +build cgo
 
+// Package rundht implements the interface between storrent and the DHT.
+// The DHT implementation itself is in package dht.
 package rundht
 
 import (
@@ -40,6 +42,7 @@ func init() {
 		"DHT bootstrap `file`.")
 }
 
+// BDHT represents the contents of the dht.dat file.
 type BDHT struct {
 	Id     []byte `bencode:"id,omitempty"`
 	Nodes  []byte `bencode:"nodes,omitempty"`
@@ -84,14 +87,15 @@ func read(filename string) (bdht *BDHT, info os.FileInfo, err error) {
 	return
 }
 
+// Read reads the dht.dat file and returns a set of potential nodes.
 func Read(filename string) (id []byte, nodes []net.TCPAddr, err error) {
-
 	bdht, info, err := read(filename)
 
 	if err != nil {
 		return
 	}
 
+	// for privacy reasons, don't honour an old id.
 	if time.Since(info.ModTime()) < time.Hour && len(bdht.Id) == 20 {
 		id = bdht.Id
 	}
@@ -104,6 +108,7 @@ func Read(filename string) (id []byte, nodes []net.TCPAddr, err error) {
 	return
 }
 
+// Write writes the dht.dat file.
 func Write(filename string, id []byte) error {
 	addrs, err := dht.GetNodes()
 	if err != nil {
@@ -136,6 +141,7 @@ func Write(filename string, id []byte) error {
 	return nil
 }
 
+// Bootstrap bootstraps the DHT.
 func Bootstrap(ctx context.Context, nodes []net.TCPAddr) {
 	bootstrap := []string{"dht.transmissionbt.com", "router.bittorrent.com"}
 
@@ -231,6 +237,7 @@ func Bootstrap(ctx context.Context, nodes []net.TCPAddr) {
 	reannounce(true)
 }
 
+// Handle reacts to events sent by the DHT.
 func Handle(dhtevent <-chan dht.Event) {
 	for {
 		event, ok := <-dhtevent
@@ -248,15 +255,18 @@ func Handle(dhtevent <-chan dht.Event) {
 	}
 }
 
+// Run starts the DHT.
 func Run(ctx context.Context, id []byte, port int) (<-chan dht.Event, error) {
 	return dht.DHT(ctx, id, uint16(port))
 }
 
+// nap is a long doze.
 func nap(n int, m int) {
 	time.Sleep(time.Duration(int64(n-m/2)*int64(time.Second) +
 		rand.Int63n(int64(m)*int64(time.Second))))
 }
 
+// doze is a short nap.
 func doze() {
 	time.Sleep(time.Millisecond +
 		time.Duration(rand.Intn(int(time.Millisecond))))
