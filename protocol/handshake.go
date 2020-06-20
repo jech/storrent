@@ -11,8 +11,13 @@ import (
 	"github.com/jech/storrent/hash"
 )
 
+// HandshakeResult is the result of a BitTorrent handshake
 type HandshakeResult struct {
-	Hash, Id            hash.Hash
+	// the torrent hash
+	Hash hash.Hash
+	// the peer's id
+	Id hash.Hash
+	// supported extensions
 	Dht, Fast, Extended bool
 }
 
@@ -45,17 +50,14 @@ func readMore(conn net.Conn, buf []byte, n int, m int) ([]byte, error) {
 		return buf, nil
 	}
 
-	buf = append(buf, make([]byte, m - l)...)
-	k, err := io.ReadAtLeast(conn, buf[l:], n - l)
-	buf = buf[:l + k]
+	buf = append(buf, make([]byte, m-l)...)
+	k, err := io.ReadAtLeast(conn, buf[l:], n-l)
+	buf = buf[:l+k]
 	return buf, err
 }
 
-func ClientHandshake(c net.Conn, cryptoHandshake bool,
-	infoHash hash.Hash, myid hash.Hash,
-	cryptoOptions *crypto.Options) (conn net.Conn,
-	result HandshakeResult, init []byte, err error) {
-
+// ClientHandshake performs the client side of a BitTorrent handshake.
+func ClientHandshake(c net.Conn, cryptoHandshake bool, infoHash hash.Hash, myid hash.Hash, cryptoOptions *crypto.Options) (conn net.Conn, result HandshakeResult, init []byte, err error) {
 	conn = c
 
 	err = conn.SetDeadline(time.Now().Add(30 * time.Second))
@@ -138,9 +140,8 @@ func checkHeader(buf []byte) bool {
 	return true
 }
 
-func ServerHandshake(c net.Conn, hashes []hash.HashPair,
-	cryptoOptions *crypto.Options) (conn net.Conn,
-	result HandshakeResult, init []byte, err error) {
+// ServerHandshake performs the server side of a BitTorrent handshake.
+func ServerHandshake(c net.Conn, hashes []hash.HashPair, cryptoOptions *crypto.Options) (conn net.Conn, result HandshakeResult, init []byte, err error) {
 	conn = c
 	err = conn.SetDeadline(time.Now().Add(90 * time.Second))
 	if err != nil {
@@ -187,7 +188,7 @@ func ServerHandshake(c net.Conn, hashes []hash.HashPair,
 	}
 
 	buf = buf[20:]
-	buf, err = readMore(conn, buf, 8 + 20, 8 + 20 + 20)
+	buf, err = readMore(conn, buf, 8+20, 8+20+20)
 	if err != nil {
 		return
 	}

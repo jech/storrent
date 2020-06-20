@@ -123,6 +123,8 @@ func sendExtended(w *bufio.Writer, subtype byte, data1, data2 []byte) error {
 	return sendMessage(w, 20, []byte{subtype}, data1, data2)
 }
 
+// Write writes a single BitTorrent message to w.  If l is not nil, then
+// the message is logged.
 func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 	debugf := func(format string, v ...interface{}) {
 		if l != nil {
@@ -253,6 +255,9 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 	}
 }
 
+// Writer writes BitTorrent messages to conn until either conn or ch is
+// closed.  To closes done when it's done.  If l is not nil, then all
+// messages written are logged.
 func Writer(conn net.Conn, l *log.Logger, ch <-chan Message, done chan<- struct{}) error {
 	defer close(done)
 

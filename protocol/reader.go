@@ -24,6 +24,7 @@ var pool sync.Pool = sync.Pool{
 	},
 }
 
+// GetBuffer gets a buffer suitable for storing a chunk of BitTorrent data.
 func GetBuffer(length int) []byte {
 	if length == int(config.ChunkSize) {
 		buf := pool.Get().([]byte)
@@ -32,6 +33,8 @@ func GetBuffer(length int) []byte {
 	return make([]byte, length)
 }
 
+// PutBuffer releases a buffer obtained by GetBuffer.  The buffer must not
+// be used again.
 func PutBuffer(buf []byte) {
 	if len(buf) == int(config.ChunkSize) {
 		pool.Put(buf)
@@ -70,6 +73,8 @@ func readUint32(r *bufio.Reader) (uint32, error) {
 	return uint32(a)<<24 | uint32(b)<<16 | uint32(c)<<8 | uint32(d), nil
 }
 
+// Read reads a single BitTorrent message from r.  If l is not nil, then
+// the message is logged.
 func Read(r *bufio.Reader, l *log.Logger) (Message, error) {
 	debugf := func(format string, v ...interface{}) {
 		if l != nil {
@@ -365,6 +370,9 @@ func Read(r *bufio.Reader, l *log.Logger) (Message, error) {
 	return Unknown{tpe}, nil
 }
 
+// Reader reads BitTorrent messages from c until it is closed.  The
+// parameter init contains data that is prepended to the data received
+// from c.  If l is not nil, then all messages read are logged.
 func Reader(c net.Conn, init []byte, l *log.Logger, ch chan<- Message, done <-chan struct{}) {
 	defer close(ch)
 

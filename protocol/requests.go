@@ -1,3 +1,4 @@
+// Package protocol implements low-level details of the BitTorrent protocol.
 package protocol
 
 import (
@@ -8,6 +9,8 @@ import (
 	"github.com/jech/storrent/pex"
 )
 
+// The subtypes we negotiate for reception of extended messages.  We send
+// the subtypes requested by the peer, as required by the extension mechanism.
 const (
 	ExtPex        uint8 = 1
 	ExtMetadata   uint8 = 2
@@ -15,6 +18,8 @@ const (
 	ExtUploadOnly uint8 = 4
 )
 
+// bootOrString is a boolean, but it can unmarshal a string.  This works
+// around some buggy peers.
 type boolOrString bool
 
 func (bs boolOrString) MarshalBencode() ([]byte, error) {
