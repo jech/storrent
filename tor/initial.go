@@ -19,6 +19,7 @@ var ErrMartianAddress = errors.New("martian address")
 var ErrConnectionSelf = errors.New("connection to self")
 var ErrDuplicateConnection = errors.New("duplicate connection")
 
+// Server accepts a peer connection.
 func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 	addr, ok := conn.RemoteAddr().(*net.TCPAddr)
 	if !ok {
@@ -59,7 +60,7 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 
 	if stats.NumPeers >= config.MaxPeersPerTorrent {
 		dropped, _ := t.DropPeer()
-		if(!dropped) {
+		if !dropped {
 			conn.Close()
 			return nil
 		}
@@ -83,8 +84,8 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 	return nil
 }
 
-func DialClient(ctx context.Context, t *Torrent, ip net.IP, port int,
-	cryptoOptions *crypto.Options) error {
+// DialClient connects to a peer.
+func DialClient(ctx context.Context, t *Torrent, ip net.IP, port int, cryptoOptions *crypto.Options) error {
 	var conn net.Conn
 	var err error
 	cryptoHandshake :=
@@ -155,8 +156,8 @@ again:
 	return err
 }
 
-func Client(conn net.Conn, t *Torrent, ip net.IP, port int, proxy string,
-	cryptoHandshake bool, cryptoOptions *crypto.Options) error {
+// Client establishes a connection with a client.
+func Client(conn net.Conn, t *Torrent, ip net.IP, port int, proxy string, cryptoHandshake bool, cryptoOptions *crypto.Options) error {
 
 	stats, err := t.GetStats()
 	if err != nil {

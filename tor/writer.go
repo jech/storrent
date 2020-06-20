@@ -9,6 +9,9 @@ import (
 
 var errClosedWriter = errors.New("closed writer")
 
+// A writer writes data to a torrent.  It is limited to writing within
+// a single piece.  It buffers internally any data that is not
+// chunk-aligned.
 type writer struct {
 	t      *Torrent
 	index  uint32
@@ -17,6 +20,8 @@ type writer struct {
 	buf    []byte
 }
 
+// NewWriter creates a writer.  The chunks covered by length have already
+// been marked as in-flight by the writer.
 func NewWriter(t *Torrent, index, offset, length uint32) *writer {
 	return &writer{t, index, offset, length, nil}
 }
@@ -43,6 +48,9 @@ func (w *writer) write(data []byte) (int, error) {
 
 var ErrShortWrite = errors.New("short write")
 
+// Write writes data to a torrent.  If the data is not aligned to chunk
+// boundaries, it is buffered within the writer.  Any completed chunks are
+// marked as no longer being in-flight.
 func (w *writer) Write(p []byte) (int, error) {
 	if w.t == nil {
 		return 0, errClosedWriter
@@ -82,6 +90,7 @@ func (w *writer) Write(p []byte) (int, error) {
 	return len(q), err
 }
 
+// ReadFrom copies data from a reader into a torrent.
 func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 	if w.t == nil {
 		return 0, errClosedWriter
@@ -108,7 +117,7 @@ func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 		peer.DownloadEstimator.Accumulate(n)
 		m, ew := w.write(w.buf)
 		copy(w.buf, w.buf[m:])
-		w.buf = w.buf[:len(w.buf) - m]
+		w.buf = w.buf[:len(w.buf)-m]
 		count += int64(n)
 		if er != nil {
 			if er != io.EOF {
@@ -124,6 +133,9 @@ func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 	return count, err
 }
 
+// Close closes a writer.  Any incomplete chunks buffered within the
+// writer are lost.  Any data remaining is marked as no longer being in
+// flight.
 func (w *writer) Close() error {
 	if w.t == nil {
 		return errClosedWriter

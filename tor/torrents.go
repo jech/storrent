@@ -2,12 +2,14 @@ package tor
 
 import (
 	"bytes"
-	"sync"
 	"github.com/jech/storrent/hash"
+	"sync"
 )
 
+// torrents is the set of torrents that we are currently handling
 var torrents sync.Map
 
+// Get finds a torrent by hash.
 func Get(hash hash.Hash) *Torrent {
 	var h [20]byte
 	copy(h[:], hash)
@@ -18,6 +20,8 @@ func Get(hash hash.Hash) *Torrent {
 	return v.(*Torrent)
 }
 
+// GetByName gets a torrent by name.  If behaves deterministically if
+// multiple torrents have the same name.
 func GetByName(name string) *Torrent {
 	var torrent *Torrent
 	Range(func(h hash.Hash, t *Torrent) bool {

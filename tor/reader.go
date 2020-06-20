@@ -11,11 +11,13 @@ import (
 
 var errClosedReader = errors.New("closed reader")
 
+// requested indicates a piece requested by a reader.
 type requested struct {
 	index uint32
 	prio  int8
 }
 
+// A Reader reads data from a torrent.  It can span piece boundaries.
 type Reader struct {
 	torrent *Torrent
 	offset  int64
@@ -28,6 +30,7 @@ type Reader struct {
 	context        context.Context
 }
 
+// NewReader creates a new Reader.
 func (t *Torrent) NewReader(ctx context.Context, offset int64, length int64) *Reader {
 	r := &Reader{
 		torrent:        t,
@@ -40,10 +43,13 @@ func (t *Torrent) NewReader(ctx context.Context, offset int64, length int64) *Re
 	return r
 }
 
+// SetContext changes the context that will abort any requests sent by the
+// reader.
 func (r *Reader) SetContext(ctx context.Context) {
 	r.context = ctx
 }
 
+// Seek sets the position of a Reader.  It doesn't trigger prefetch.
 func (r *Reader) Seek(o int64, whence int) (n int64, err error) {
 	if r.torrent == nil {
 		return r.position, errClosedReader
@@ -66,6 +72,7 @@ func (r *Reader) Seek(o int64, whence int) (n int64, err error) {
 	return pos, nil
 }
 
+// chunks returns a list of chunks to request.
 func (r *Reader) chunks(pos int64, limit int64) []requested {
 	if pos < 0 || pos > limit {
 		return nil
@@ -107,6 +114,7 @@ func (r *Reader) chunks(pos int64, limit int64) []requested {
 	return c
 }
 
+// request causes a reader to request chunks from a torrent.
 func (r *Reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 	if r.requestedIndex >= 0 {
 		index := uint32(pos / int64(r.torrent.Pieces.PieceSize()))
@@ -149,6 +157,7 @@ func (r *Reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 	return done, err
 }
 
+// Read reads data from a torrent, performing prefetch as necessary.
 func (r *Reader) Read(a []byte) (n int, err error) {
 	t := r.torrent
 	if t == nil {
@@ -205,6 +214,7 @@ func (r *Reader) Read(a []byte) (n int, err error) {
 	return
 }
 
+// Close closes a reader.  Any in-flight requests are cancelled.
 func (r *Reader) Close() error {
 	r.request(-1, -1)
 	r.torrent = nil

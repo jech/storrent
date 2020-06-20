@@ -169,7 +169,7 @@ func ReadTorrent(proxy string, r io.Reader) (*Torrent, error) {
 	} else if torrent.Announce != "" {
 		tr := tracker.New(torrent.Announce)
 		if tr != nil {
-			announce = [][]tracker.Tracker{[]tracker.Tracker{tr}}
+			announce = [][]tracker.Tracker{{tr}}
 		}
 	}
 

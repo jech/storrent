@@ -1,3 +1,4 @@
+// Package tor implements behaviour of torrents in storrent.
 package tor
 
 import (
@@ -32,21 +33,22 @@ import (
 var ErrTorrentDead = errors.New("torrent is dead")
 var ErrMetadataIncomplete = errors.New("metadata incomplete")
 
+// Torrent represents an active torrent.
 type Torrent struct {
 	proxy           string
 	Hash            hash.Hash
 	MyId            hash.Hash
-	Info            []byte
+	Info            []byte // raw info dictionary
 	CreationDate    int64
 	trackers        [][]tracker.Tracker
 	webseeds        []webseed.Webseed
-	infoComplete    uint32
-	infoBitmap      bitmap.Bitmap
-	infoRequested   []uint8
-	infoSizeVotes   map[uint32]int
+	infoComplete    uint32         // 1 when metadata is complete
+	infoBitmap      bitmap.Bitmap  // bitmap of available metadata
+	infoRequested   []uint8        // chunks of metadata in flight
+	infoSizeVotes   map[uint32]int // used for determining metadata size
 	PieceHashes     []hash.Hash
 	Name            string
-	Files           []Torfile
+	Files           []Torfile // nil if single-file torrent
 	Pieces          piece.Pieces
 	available       []uint16
 	inFlight        []uint8
@@ -59,21 +61,22 @@ type Torrent struct {
 	known           known.Peers
 	Log             *log.Logger
 	rand            *rand.Rand
-	requestInterval time.Duration
-	requestSeconds  float64
-	requestTicker   *time.Ticker
-	announceTime    time.Time
+	requestInterval time.Duration // interval of requestTicker
+	requestSeconds  float64       // same in seconds
+	requestTicker   *time.Ticker  // governs sending chunk requests
+	announceTime    time.Time     // DHT
 	useDht          bool
 	dhtPassive      bool
 	useTrackers     bool
 	useWebseeds     bool
 }
 
+// Torfile represents a file within a torrent.
 type Torfile struct {
 	Path    []string
-	Offset  int64
-	Length  int64
-	Padding bool
+	Offset  int64 // offset within the torrent
+	Length  int64 // length of the file
+	Padding bool  // true if a padding file
 }
 
 func New(proxy string, hsh hash.Hash, dn string,
@@ -103,6 +106,7 @@ func New(proxy string, hsh hash.Hash, dn string,
 	}, nil
 }
 
+// Announce performs a DHT announce.
 func Announce(h hash.Hash, ipv6 bool) error {
 	t := Get(h)
 	if t == nil {
@@ -133,6 +137,7 @@ func (t *Torrent) announce(ipv6 bool) {
 	t.announceTime = time.Now()
 }
 
+// AddTorrent starts a new torrent.
 func AddTorrent(ctx context.Context, t *Torrent) (*Torrent, error) {
 	t.Event = make(chan peer.TorEvent, 512)
 	t.Done = make(chan struct{})
@@ -156,6 +161,7 @@ func AddTorrent(ctx context.Context, t *Torrent) (*Torrent, error) {
 	return t, nil
 }
 
+// run is the main loop of a torrent.
 func (t *Torrent) run(ctx context.Context) {
 	defer func() {
 		close(t.Done)
@@ -529,6 +535,7 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 	return nil
 }
 
+// writePeer sends an event to a peer.
 func writePeer(p *peer.Peer, e peer.PeerEvent) error {
 	select {
 	case p.Event <- e:
@@ -538,6 +545,8 @@ func writePeer(p *peer.Peer, e peer.PeerEvent) error {
 	}
 }
 
+// writePeers writes an event to all peers.  If non-nil, except indicates
+// a peer to be excluded.
 func writePeers(t *Torrent, e peer.PeerEvent, except *peer.Peer) {
 	for _, p := range t.peers {
 		if p != except {
@@ -546,6 +555,7 @@ func writePeers(t *Torrent, e peer.PeerEvent, except *peer.Peer) {
 	}
 }
 
+// maybeWritePeer is like write peer, but excludes congested peers.
 func maybeWritePeer(p *peer.Peer, e peer.PeerEvent) error {
 	select {
 	case p.Event <- e:
@@ -557,6 +567,7 @@ func maybeWritePeer(p *peer.Peer, e peer.PeerEvent) error {
 	}
 }
 
+// delPeer removes a peer after it sent TorPeerGoaway.
 func delPeer(t *Torrent, p *peer.Peer) bool {
 	var found bool
 	for i, q := range t.peers {
@@ -572,7 +583,7 @@ func delPeer(t *Torrent, p *peer.Peer) bool {
 	// at this point, the dying peer won't reply to a GetPex request
 	port := p.GetPort()
 	if port > 0 {
-		pp := []pex.Peer{pex.Peer{
+		pp := []pex.Peer{{
 			IP:   p.IP,
 			Port: port,
 		}}
@@ -581,6 +592,7 @@ func delPeer(t *Torrent, p *peer.Peer) bool {
 	return found
 }
 
+// setRequestInterval sets the interval of the request ticker.
 func (t *Torrent) setRequestInterval(interval time.Duration) {
 	if interval == t.requestInterval ||
 		(interval > 0 &&
@@ -605,9 +617,13 @@ func (t *Torrent) setRequestInterval(interval time.Duration) {
 	t.requestSeconds = float64(interval) / float64(time.Second)
 }
 
-const fastInterval = 250 * time.Millisecond
-const slowInterval = 2 * time.Second
+const (
+	fastInterval = 250 * time.Millisecond
+	slowInterval = 2 * time.Second
+)
 
+// finalisePIece is called when a piece is complete in order to verify its
+// hash and trigger sending data to clients.
 func finalisePiece(t *Torrent, index uint32) {
 	if index >= uint32(len(t.PieceHashes)) {
 		t.Log.Printf("FinalisePiece: %v >= %v",
@@ -643,6 +659,10 @@ func notInterested(t *Torrent) {
 	}
 }
 
+// requestPiece requests a piece with a given priority, or cancels a piece
+// request, depending on the value of request.  It returns a boolean
+// indicating whether the piece was actually added, and a channel that
+// will be closed when the piece is complete (nil if already complete).
 func requestPiece(t *Torrent, index uint32, prio int8, request bool, want bool) (<-chan struct{}, bool) {
 	if index > uint32(len(t.PieceHashes)) {
 		return nil, false
@@ -667,6 +687,7 @@ func requestPiece(t *Torrent, index uint32, prio int8, request bool, want bool) 
 	return done, added
 }
 
+// noteAvailable increases or decreases the local availability of a piece.
 func noteAvailable(t *Torrent, index uint32, have bool) {
 	if len(t.available) <= int(index) {
 		t.available = append(t.available,
@@ -687,6 +708,8 @@ func noteAvailable(t *Torrent, index uint32, have bool) {
 	}
 }
 
+// noteInFlight increases or decreases the count of in-flight requests for
+// a chunk.
 func noteInFlight(t *Torrent, index uint32, have bool) {
 	if have {
 		if t.inFlight[index] >= ^uint8(0) {
@@ -708,6 +731,8 @@ type chunk struct {
 	prio  int8
 }
 
+// getChunks returns a list of requested available chunks and a list of
+// requested unavailable chunks.
 func getChunks(t *Torrent, prio int8, max int) ([]chunk, []uint32) {
 	cpp := t.Pieces.PieceSize() / config.ChunkSize
 	var chunks []chunk
@@ -744,10 +769,12 @@ outer:
 	return chunks, unavailable
 }
 
+// numChunks computes the number of chunks that should be in-flight.
 func numChunks(t *Torrent, rate float64) int {
 	return int(rate*t.requestSeconds*(1/float64(config.ChunkSize)) + 0.5)
 }
 
+// request requests that a peer request a list of chunks.
 func request(t *Torrent, p *peer.Peer, indices []uint32) error {
 	err := maybeWritePeer(p, peer.PeerRequest{indices})
 	if err == nil {
@@ -758,6 +785,7 @@ func request(t *Torrent, p *peer.Peer, indices []uint32) error {
 	return err
 }
 
+// maxInFlight returns the maximum number of in-flight requests that we am for.
 func maxInFlight(prio int8) uint8 {
 	if prio > 0 {
 		return 3
@@ -768,8 +796,11 @@ func maxInFlight(prio int8) uint8 {
 	return 1
 }
 
+// fastPieces is the number of pieces at which we stop listening to
+// "Allowed Fast" requests (BEP-006)
 const fastPieces = 8
 
+// maybeRequest requests some chunks.  Or not.
 func maybeRequest(ctx context.Context, t *Torrent) {
 	prio := pickPriority(t)
 	if prio > IdlePriority {
@@ -777,6 +808,7 @@ func maybeRequest(ctx context.Context, t *Torrent) {
 	}
 }
 
+// periodicRequest is called periodically to request more chunks.
 func periodicRequest(ctx context.Context, t *Torrent) {
 	if t.infoComplete == 0 {
 		t.setRequestInterval(0)
@@ -973,7 +1005,7 @@ func fileChunks(t *Torrent, index, offset, length uint32) []filechunk {
 	o := int64(index)*int64(t.Pieces.PieceSize()) + int64(offset)
 	l := int64(length)
 	if t.Files == nil {
-		return []filechunk{filechunk{nil,
+		return []filechunk{{nil,
 			t.Pieces.Length(), o, l, false}}
 	}
 	var fcs []filechunk
@@ -1004,6 +1036,7 @@ func fileChunks(t *Torrent, index, offset, length uint32) []filechunk {
 	return fcs
 }
 
+// maybeWebseed requests some data from webseeds.  Or not.
 func maybeWebseed(ctx context.Context, t *Torrent, index uint32, idle bool) bool {
 	if !hasWebseeds(t) {
 		return false
@@ -1100,8 +1133,8 @@ func (r *zeroReader) Read(buf []byte) (int, error) {
 	return n, err
 }
 
-func webseedGR(ctx context.Context, ws *webseed.GetRight,
-	t *Torrent, index, offset, length uint32) {
+// webseedGR fetches data from a GetRight webseed.
+func webseedGR(ctx context.Context, ws *webseed.GetRight, t *Torrent, index, offset, length uint32) {
 	fcs := fileChunks(t, index, offset, length)
 	writer := NewWriter(t, index, offset, length)
 	defer writer.Close()
@@ -1125,6 +1158,7 @@ func webseedGR(ctx context.Context, ws *webseed.GetRight,
 	}
 }
 
+// webseedH fetches data from a Hoffman-style webseed.
 func webseedH(ctx context.Context, ws *webseed.Hoffman,
 	t *Torrent, index, offset, length uint32) {
 	w := NewWriter(t, index, offset, length)
@@ -1175,6 +1209,7 @@ func isFast(i uint32, fast []uint32) bool {
 	return false
 }
 
+// pickIdlePieces chooses pieces to request when we are idle.
 func pickIdlePieces(t *Torrent, count int) {
 	maxp := t.Pieces.Num()
 	pcount := t.Pieces.Count()
@@ -1298,6 +1333,7 @@ func pickIdlePieces(t *Torrent, count int) {
 	return
 }
 
+// maybeConnect attempts to connect a new peer.  Or not.
 func maybeConnect(ctx context.Context, t *Torrent) {
 	max := config.MinPeersPerTorrent
 	if t.hasProxy() {
@@ -1362,8 +1398,11 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 	}
 }
 
+// maxUnchoking is the maximum number of peers that we unchoke in a torrent
 const maxUnchoking = 5
 
+// maybeUnchoke unchokes a new peer.  If periodic is false, then no
+// currently unchoked peer will be choked.
 func maybeUnchoke(t *Torrent, periodic bool) {
 	unchoking := make([]*peer.Peer, 0, maxUnchoking)
 	interested := make([]*peer.Peer, 0)
@@ -1481,9 +1520,7 @@ func (t *Torrent) Kill(ctx context.Context) error {
 	}
 }
 
-func (t *Torrent) NewPeer(proxy string, conn net.Conn,
-	ip net.IP, port int, incoming bool,
-	result protocol.HandshakeResult, init []byte) error {
+func (t *Torrent) NewPeer(proxy string, conn net.Conn, ip net.IP, port int, incoming bool, result protocol.HandshakeResult, init []byte) error {
 	if !result.Hash.Equals(t.Hash) {
 		conn.Close()
 		return errors.New("hash mismatch")
@@ -1513,6 +1550,7 @@ func (t *Torrent) AddKnown(ip net.IP, port int, id hash.Hash, version string,
 	}
 }
 
+// BadPeer is called when a peer participated in a failed piece.
 func (t *Torrent) BadPeer(p uint32, bad bool) error {
 	select {
 	case t.Event <- peer.TorBadPeer{p, bad}:
@@ -1543,6 +1581,8 @@ func (t *Torrent) GetStats() (*peer.TorStats, error) {
 	}
 }
 
+// Available is an array indicating the number of locally available copies
+// of each piece in a torrent.
 type Available []uint16
 
 func (a Available) Available(index int) int {
@@ -1552,6 +1592,7 @@ func (a Available) Available(index int) int {
 	return 0
 }
 
+// AvailableRange returns the number of copies of a subrange of a torrent.
 func (a Available) AvailableRange(t *Torrent, offset int64, length int64) int {
 	r := math.MaxInt32
 	ps := int64(t.Pieces.PieceSize())
@@ -1564,6 +1605,7 @@ func (a Available) AvailableRange(t *Torrent, offset int64, length int64) int {
 	return r
 }
 
+// GetAvailable returns information about piece availability.
 func (t *Torrent) GetAvailable() (Available, error) {
 	ch := make(chan []uint16)
 	select {
@@ -1579,6 +1621,7 @@ func (t *Torrent) GetAvailable() (Available, error) {
 	}
 }
 
+// DropPeer requests that a peer should be dropped.
 func (t *Torrent) DropPeer() (bool, error) {
 	ch := make(chan bool)
 	select {
@@ -1594,6 +1637,7 @@ func (t *Torrent) DropPeer() (bool, error) {
 	}
 }
 
+// GetPeer returns a given peer.
 func (t *Torrent) GetPeer(id hash.Hash) (*peer.Peer, error) {
 	ch := make(chan *peer.Peer)
 	select {
@@ -1609,6 +1653,7 @@ func (t *Torrent) GetPeer(id hash.Hash) (*peer.Peer, error) {
 	}
 }
 
+// GetPeers returns all peers of a torrent.
 func (t *Torrent) GetPeers() ([]*peer.Peer, error) {
 	ch := make(chan []*peer.Peer)
 	select {
@@ -1657,6 +1702,7 @@ func (t *Torrent) GetKnowns() ([]known.Peer, error) {
 	}
 }
 
+// Have indicates that a piece is available.
 func (t *Torrent) Have(index uint32, have bool) error {
 	select {
 	case t.Event <- peer.TorHave{index, have}:
@@ -1666,6 +1712,7 @@ func (t *Torrent) Have(index uint32, have bool) error {
 	}
 }
 
+// GetConf returns the configuration of a torrent.
 func (t *Torrent) GetConf() (peer.TorConf, error) {
 	ch := make(chan peer.TorConf)
 	select {
@@ -1681,6 +1728,7 @@ func (t *Torrent) GetConf() (peer.TorConf, error) {
 	}
 }
 
+// SetConf reconfigures a torrent.
 func (t *Torrent) SetConf(conf peer.TorConf) error {
 	ch := make(chan struct{})
 	select {
@@ -1698,17 +1746,25 @@ func (t *Torrent) SetConf(conf peer.TorConf) error {
 	}
 }
 
+// InfoComplete returns true if the metadata of a torrent is complete.
 func (t *Torrent) InfoComplete() bool {
 	return atomic.LoadUint32(&t.infoComplete) != 0
 }
 
+// Trackers returns the set of trackers of a torrent.
 func (t *Torrent) Trackers() [][]tracker.Tracker {
 	return t.trackers
 }
+
+// Webseeds returns the set of webseeds of a torrent.
 func (t *Torrent) Webseeds() []webseed.Webseed {
 	return t.webseeds
 }
 
+// Request requests a piece from a torrent with given priority and updates
+// the piece's access time.  It returns a boolean indicating whether the
+// piece was requested and a channel that will be closed when the piece is
+// complete (nil if already complete).
 func (t *Torrent) Request(index uint32, prio int8, request bool, want bool) (bool, <-chan struct{}, error) {
 	if atomic.LoadUint32(&t.infoComplete) == 0 {
 		return false, nil, ErrMetadataIncomplete
@@ -1740,6 +1796,7 @@ func (t *Torrent) Request(index uint32, prio int8, request bool, want bool) (boo
 	}
 }
 
+// Expire discards pieces in order to meet our memory usage target.
 func Expire() int {
 	low := config.MemoryLowMark()
 	high := config.MemoryHighMark()
@@ -1785,7 +1842,8 @@ func Expire() int {
 	return -1
 }
 
-// This follows the uTorrent interpretation, not what the BEP says.
+// trackerAnnounce is called periodically to announce a torrent to its
+// trackers.  It follows the uTorrent interpretation, not what the BEP says.
 func trackerAnnounce(ctx context.Context, t *Torrent) {
 	tn := t.rand.Perm(len(t.trackers))
 	for _, i := range tn {
