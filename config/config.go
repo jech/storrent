@@ -1,3 +1,4 @@
+// Package config implements global configuration data for storrent.
 package config
 
 import (
@@ -6,10 +7,15 @@ import (
 	"github.com/jech/storrent/hash"
 )
 
+// ProtocolPort is the port over which we accept TCP connections and UDP
+// datagrams.
 var ProtocolPort int
-var externalTCPPort int32
-var externalUDPPort int32
 
+var externalTCPPort, externalUDPPort int32
+
+// ExternalPort returns the external port used for TCP or UDP traffic for
+// a given protocol family.  For IPv4, this can be different from ProtocolPort
+// if we are behind a NAT.  For IPv6, this is always equal to ProtocolPort.
 func ExternalPort(tcp bool, ipv6 bool) int {
 	if ipv6 {
 		return ProtocolPort
@@ -20,6 +26,7 @@ func ExternalPort(tcp bool, ipv6 bool) int {
 	return int(atomic.LoadInt32(&externalUDPPort))
 }
 
+// SetExternalIPv4Port records our idea of the external port.
 func SetExternalIPv4Port(port int, tcp bool) {
 	if tcp {
 		atomic.StoreInt32(&externalTCPPort, int32(port))
@@ -28,9 +35,13 @@ func SetExternalIPv4Port(port int, tcp bool) {
 	atomic.StoreInt32(&externalUDPPort, int32(port))
 }
 
+// HTTPAddr is the address on which
 var HTTPAddr string
 
+// DHTBootstrap is the filename of the dht.dat file.
 var DHTBootstrap string
+
+// DhtID is our DHT id.
 var DhtID hash.Hash
 
 const (
@@ -47,10 +58,15 @@ func MemoryLowMark() int64 {
 	return MemoryMark * 7 / 8
 }
 
+// ChunkSize defines the size of the chunks that we request.  While in
+// principle BEP-3 allows arbitrary powers of two, in practice other
+// BitTorrent implementations only honour requests for 16kB.
 const ChunkSize uint32 = 16 * 1024
 
 var uploadRate uint32 = 512 * 1024
 
+// UploadRate specifies our maximum upload rate.  This is a hard limit (up
+// to fluctuations due to the rate estimator).
 func UploadRate() float64 {
 	return float64(atomic.LoadUint32(&uploadRate))
 }
@@ -70,6 +86,8 @@ func SetUploadRate(rate float64) {
 var PrefetchRate float64
 var idleRate uint32 = 64 * 1024
 
+// IdleRate is the download rate for which we aim when no client requests
+// any data.
 func IdleRate() float64 {
 	return float64(atomic.LoadUint32(&idleRate))
 }
@@ -90,11 +108,18 @@ func SetDefaultProxy(s string) error {
 	return nil
 }
 
+// DefaultProxy specifies the proxy through which we make both BitTorrent
+// and tracker connections.  The DHT does not honour the proxy.
 func DefaultProxy() string {
 	return defaultProxyDialer.Load().(string)
 }
 
+// DefaultUseDht, DefaultDhtPassive, DefaultUseTrackers, DefaultUseWebseeds
+// specify the options of newly created torrents.
 var DefaultUseDht, DefaultDhtPassive, DefaultUseTrackers, DefaultUseWebseeds bool
+
+// DefaultEncryption specifies the encryption policy for newly created
+// torrents.  It is an index into crypto.OptionsMap.
 var DefaultEncryption int
 
 var Debug bool
