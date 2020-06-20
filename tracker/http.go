@@ -14,10 +14,12 @@ import (
 	"github.com/jech/storrent/httpclient"
 )
 
+// HTTP represents a tracker accessed over HTTP or HTTPS.
 type HTTP struct {
 	base
 }
 
+// httpReply is an HTTP tracker's reply.
 type httpReply struct {
 	FailureReason string             `bencode:"failure reason"`
 	RetryIn       string             `bencode:"retry in"`
@@ -26,11 +28,13 @@ type httpReply struct {
 	Peers6        []byte             `bencode:"peers6,omitempty"`
 }
 
+// peer is a peer returned by a tracker.
 type peer struct {
 	IP   string `bencode:"ip"`
 	Port int    `bencode:"port"`
 }
 
+// Announce performs an HTTP announce over both IPv4 and IPv6 in parallel.
 func (tracker *HTTP) Announce(ctx context.Context, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
 	f func(net.IP, int) bool) error {
@@ -54,6 +58,7 @@ func (tracker *HTTP) Announce(ctx context.Context, hash []byte, myid []byte,
 	return err
 }
 
+// announceHTTP performs a single HTTP announce
 func announceHTTP(ctx context.Context, tracker *HTTP, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
 	f func(net.IP, int) bool) (int, error) {
@@ -126,6 +131,7 @@ func announceHTTP(ctx context.Context, tracker *HTTP, hash []byte, myid []byte,
 	var peers []byte
 	err = bencode.DecodeBytes(reply.Peers, &peers)
 	if err == nil && len(peers)%6 == 0 {
+		// compact format
 		for i := 0; i < len(peers); i += 6 {
 			ip := net.IP(make([]byte, 4))
 			copy(ip, peers[i:i+4])
@@ -133,6 +139,7 @@ func announceHTTP(ctx context.Context, tracker *HTTP, hash []byte, myid []byte,
 			f(ip, port)
 		}
 	} else {
+		// original format
 		var peers []peer
 		err = bencode.DecodeBytes(reply.Peers, &peers)
 		if err == nil {
@@ -146,6 +153,7 @@ func announceHTTP(ctx context.Context, tracker *HTTP, hash []byte, myid []byte,
 	}
 
 	if len(reply.Peers6)%18 == 0 {
+		// peers6 is always in compact format
 		for i := 0; i < len(reply.Peers6); i += 18 {
 			ip := net.IP(make([]byte, 16))
 			copy(ip, reply.Peers6[i:i+16])

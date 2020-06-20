@@ -1,3 +1,5 @@
+// Package tracker implements the HTTP and UDP BitTorrent tracker protocols,
+// as defined in BEP-3, BEP-7, BEP-23 and BEP-15.
 package tracker
 
 import (
@@ -15,6 +17,7 @@ var (
 	ErrParse    = errors.New("couldn't parse tracker reply")
 )
 
+// Type base implements the tracker lifetime.
 type base struct {
 	url      string
 	time     time.Time
@@ -23,14 +26,20 @@ type base struct {
 	locked   int32
 }
 
+// Type Tracker represents a BitTorrent tracker.
 type Tracker interface {
+	// URL returns the tracker URL
 	URL() string
+	// GetState returns the tracker's state.  If the state is Error,
+	// then GetState also returns an error value.
 	GetState() (State, error)
+	// Announce performs parallel announces over both IPv4 and IPv6.
 	Announce(ctx context.Context, hash []byte, myid []byte,
 		want int, size int64, port4, port6 int, proxy string,
 		f func(net.IP, int) bool) error
 }
 
+// New creates a new tracker from a URL.
 func New(url string) Tracker {
 	u, err := nurl.Parse(url)
 	if err != nil {
@@ -72,14 +81,15 @@ func (tracker *base) ready() bool {
 	return tracker.time.Add(interval).Before(time.Now())
 }
 
+// Type State represtents the state of a tracker.
 type State int
 
 const (
-	Disabled State = -3
-	Error    State = -2
-	Busy     State = -1
-	Idle     State = 0
-	Ready    State = 1
+	Disabled State = -3 // the tracker is disabled
+	Error    State = -2 // last request failed
+	Busy     State = -1 // a request is in progress
+	Idle     State = 0  // it's not time yet for a new request
+	Ready    State = 1  // a request may be scheduled now
 )
 
 func (state State) String() string {
@@ -99,6 +109,7 @@ func (state State) String() string {
 	}
 }
 
+// GetState returns a tracker's state.
 func (tracker *base) GetState() (State, error) {
 	ok := tracker.tryLock()
 	if !ok {
@@ -115,6 +126,7 @@ func (tracker *base) GetState() (State, error) {
 	return Idle, nil
 }
 
+// updateInterval updates a tracker's announce interval.
 func (tracker *base) updateInterval(interval time.Duration, err error) {
 	tracker.err = err
 	if interval > time.Minute {
@@ -124,16 +136,19 @@ func (tracker *base) updateInterval(interval time.Duration, err error) {
 	}
 }
 
+// Announce performs parallel announces over both IPv4 and IPv6.
 func (tracker *base) Announce(ctx context.Context, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
 	f func(net.IP, int) bool) error {
 	return errors.New("not implemented")
 }
 
+// Unknown represents a tracker with an unknown scheme.
 type Unknown struct {
 	base
 }
 
+// GetState for an tracker with an unknown scheme always returns Disabled.
 func (tracker *Unknown) GetState() (State, error) {
 	return Disabled, nil
 }

@@ -16,10 +16,12 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// UDP represents a tracker using the protocol defined in BEP-15.
 type UDP struct {
 	base
 }
 
+// Announce performs a UDP announce over IPv4 and Ipv6 in parallel.
 func (tracker *UDP) Announce(ctx context.Context, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
 	f func(net.IP, int) bool) error {
@@ -234,7 +236,9 @@ func announceUDP(ctx context.Context, prot string,
 	return interval, err
 }
 
-
+// udpRequestReply sends a UDP request and waits for a reply.  If no reply
+// is received, it resends the request with exponential backoff up to four
+// times.
 func udpRequestReply(ctx context.Context, conn net.Conn, request []byte,
 	min int, action uint32, tid uint32) (*bytes.Reader, error) {
 	var err error
