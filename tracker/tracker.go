@@ -29,7 +29,6 @@ type Tracker interface {
 	Announce(ctx context.Context, hash []byte, myid []byte,
 		want int, size int64, port4, port6 int, proxy string,
 		f func(net.IP, int) bool) error
-	Kill() error
 }
 
 func New(url string) Tracker {
@@ -129,10 +128,6 @@ func (tracker *base) Announce(ctx context.Context, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
 	f func(net.IP, int) bool) error {
 	return errors.New("not implemented")
-}
-
-func (tracker *base) Kill() error {
-	return nil
 }
 
 type Unknown struct {

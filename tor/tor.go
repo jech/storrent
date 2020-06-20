@@ -507,20 +507,12 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		announce :=
 			(!t.useDht && c.Conf.UseDht == peer.ConfTrue) ||
 				(t.dhtPassive && c.Conf.DhtPassive == peer.ConfFalse)
-		kill := t.useTrackers && c.Conf.UseTrackers == peer.ConfFalse
 		peer.ConfSet(&t.useDht, c.Conf.UseDht)
 		peer.ConfSet(&t.dhtPassive, c.Conf.DhtPassive)
 		peer.ConfSet(&t.useTrackers, c.Conf.UseTrackers)
 		peer.ConfSet(&t.useWebseeds, c.Conf.UseWebseeds)
 		if c.Ch != nil {
 			close(c.Ch)
-		}
-		if kill {
-			for _, tl := range t.trackers {
-				if len(tl) > 0 {
-					tl[0].Kill()
-				}
-			}
 		}
 		if announce {
 			t.announce(true)
