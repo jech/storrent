@@ -145,6 +145,22 @@ func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	pth := path.Parse(dir.name)
 
 	ents := make([]fuse.Dirent, 0)
+
+	ents = append(ents, fuse.Dirent{
+		Name:  ".",
+		Type:  fuse.DT_Dir,
+		Inode: fileInode(dir.t.Hash, pth),
+	})
+	parentInode := uint64(1)
+	if len(pth) > 0 {
+		parentInode = fileInode(dir.t.Hash, pth[:len(pth)-1])
+	}
+	ents = append(ents, fuse.Dirent{
+		Name:  "..",
+		Type:  fuse.DT_Dir,
+		Inode: parentInode,
+	})
+
 	dirs := make(map[string]bool)
 	for _, f := range dir.t.Files {
 		if f.Padding {
