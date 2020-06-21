@@ -21,7 +21,7 @@ type writer struct {
 }
 
 // NewWriter creates a writer.  The chunks covered by length have already
-// been marked as in-flight by the writer.
+// been marked as in-flight by the caller.
 func NewWriter(t *Torrent, index, offset, length uint32) *writer {
 	return &writer{t, index, offset, length, nil}
 }
