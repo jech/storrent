@@ -7,7 +7,6 @@ import (
 	"hash/fnv"
 	"io"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 
@@ -92,7 +91,7 @@ func (dir root) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	copy(h[:], t.Hash)
 
 	if t.Files == nil {
-		return file{hash: h}, nil
+		return file{h, t.Name}, nil
 	}
 
 	return directory{hash: h}, nil
@@ -158,10 +157,11 @@ func (dir directory) Lookup(ctx context.Context, name string) (fs.Node, error) {
 		if f.Path.Within(pth) && f.Path[len(pth)] == name {
 			p := append(path.Path(nil), pth...)
 			p = append(p, name)
+			filename := p.String()
 			if len(f.Path) > len(pth)+1 {
-				return directory{h, p.String()}, nil
+				return directory{h, filename}, nil
 			} else {
-				return file{h, p.String()}, nil
+				return file{h, filename}, nil
 			}
 		}
 	}
@@ -249,9 +249,6 @@ func (file file) Attr(ctx context.Context, a *fuse.Attr) error {
 
 	var size uint64
 	if t.Files == nil {
-		if len(pth) > 0 {
-			return fuse.ENOENT
-		}
 		size = uint64(t.Pieces.Length())
 	} else {
 		f := findFile(t, pth)
@@ -278,27 +275,6 @@ type handle struct {
 	reader *tor.Reader
 }
 
-// Maps file names to torrent hashes, avoids cache corruption if two
-// torrents have the same name.
-var cached struct {
-	mu     sync.Mutex
-	cached map[string]hash.Hash
-}
-
-func cachedValid(name string, hsh hash.Hash) bool {
-	cached.mu.Lock()
-	defer cached.mu.Unlock()
-	if cached.cached == nil {
-		cached.cached = make(map[string]hash.Hash)
-	}
-	h, ok := cached.cached[name]
-	if ok && h.Equal(hsh) {
-		return true
-	}
-	cached.cached[name] = hsh
-	return false
-}
-
 func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	t := tor.Get(file.Hash())
 	if t == nil || !t.InfoComplete() {
@@ -312,9 +288,6 @@ func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 	var offset, length int64
 
 	if t.Files == nil {
-		if file.name != "" {
-			return nil, fuse.ENOENT
-		}
 		offset = 0
 		length = t.Pieces.Length()
 	} else {
@@ -329,9 +302,8 @@ func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 	if reader == nil {
 		return nil, fuse.EIO
 	}
-	if cachedValid(t.Name+"/"+file.name, t.Hash) {
-		resp.Flags |= fuse.OpenKeepCache
-	}
+
+	resp.Flags |= fuse.OpenKeepCache
 
 	return handle{file, reader}, nil
 }
