@@ -208,7 +208,7 @@ func ServerHandshake(c net.Conn, hashes []hash.HashPair, cryptoOptions *crypto.O
 	copy(hsh, buf)
 	buf = buf[20:]
 
-	if skey != nil && !skey.Equals(hsh) {
+	if skey != nil && !skey.Equal(hsh) {
 		err = errors.New("crypto hash mismatch")
 		return
 	}
@@ -216,7 +216,7 @@ func ServerHandshake(c net.Conn, hashes []hash.HashPair, cryptoOptions *crypto.O
 	found := false
 	var h hash.HashPair
 	for _, h = range hashes {
-		if hsh.Equals(h.First) {
+		if hsh.Equal(h.First) {
 			found = true
 			break
 		}

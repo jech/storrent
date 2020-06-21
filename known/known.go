@@ -170,7 +170,7 @@ func Find(peers Peers, ip net.IP, port int, id hash.Hash, version string,
 	kp := peers[key]
 
 	if kp != nil {
-		if id != nil && kp.Id != nil && !id.Equals(kp.Id) {
+		if id != nil && kp.Id != nil && !id.Equal(kp.Id) {
 			kp.Id = nil
 		}
 		if kp.Id == nil {
@@ -197,7 +197,7 @@ func FindId(peers Peers, id hash.Hash, ip net.IP, port int) *Peer {
 	for _, kp := range peers {
 		if kp.Addr.IP.Equal(ip) &&
 			(port == 0 || kp.Addr.Port == port) &&
-			kp.Id != nil && id.Equals(kp.Id) {
+			kp.Id != nil && id.Equal(kp.Id) {
 			return kp
 		}
 	}

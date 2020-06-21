@@ -281,7 +281,7 @@ func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 	cachedmu.Lock()
 	defer cachedmu.Unlock()
 	h, ok := cached[n]
-	if ok && h.Equals(file.t.Hash) {
+	if ok && h.Equal(file.t.Hash) {
 		resp.Flags |= fuse.OpenKeepCache
 	} else {
 		cached[n] = file.t.Hash

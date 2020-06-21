@@ -42,7 +42,7 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 		return protocol.ErrUnknownTorrent
 	}
 
-	if result.Id.Equals(t.MyId) {
+	if result.Id.Equal(t.MyId) {
 		conn.Close()
 		return ErrConnectionSelf
 	}
@@ -184,7 +184,7 @@ func Client(conn net.Conn, t *Torrent, ip net.IP, port int, proxy string, crypto
 		return err
 	}
 
-	if result.Id.Equals(t.MyId) {
+	if result.Id.Equal(t.MyId) {
 		conn.Close()
 		return ErrConnectionSelf
 	}

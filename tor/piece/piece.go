@@ -328,7 +328,7 @@ func (ps *Pieces) Finalise(index uint32, h hash.Hash) (done bool, peers []uint32
 	ps.mu.Lock()
 	peers = ps.pieces[index].peers
 	ps.pieces[index].peers = nil
-	if !hh.Equals(h) {
+	if !hh.Equal(h) {
 		ps.pieces[index].setState(stateBusy, 0)
 		ps.del(index, true)
 		err = ErrHashMismatch

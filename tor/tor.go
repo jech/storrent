@@ -362,7 +362,7 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		close(c.Ch)
 	case peer.TorGetPeer:
 		for _, p := range t.peers {
-			if p.Id.Equals(c.Id) {
+			if p.Id.Equal(c.Id) {
 				c.Ch <- p
 				break
 			}
@@ -1363,7 +1363,7 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 		if !kp.Recent() || kp.Bad() {
 			continue
 		}
-		if kp.Id != nil && kp.Id.Equals(t.MyId) {
+		if kp.Id != nil && kp.Id.Equal(t.MyId) {
 			continue
 		}
 		if kp.Id != nil && findPeer(t, kp.Id) != nil {
@@ -1493,7 +1493,7 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 
 func findPeer(t *Torrent, id hash.Hash) *peer.Peer {
 	for _, p := range t.peers {
-		if id.Equals(p.Id) {
+		if id.Equal(p.Id) {
 			return p
 		}
 	}
@@ -1521,7 +1521,7 @@ func (t *Torrent) Kill(ctx context.Context) error {
 }
 
 func (t *Torrent) NewPeer(proxy string, conn net.Conn, ip net.IP, port int, incoming bool, result protocol.HandshakeResult, init []byte) error {
-	if !result.Hash.Equals(t.Hash) {
+	if !result.Hash.Equal(t.Hash) {
 		conn.Close()
 		return errors.New("hash mismatch")
 	}

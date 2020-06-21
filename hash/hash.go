@@ -22,7 +22,7 @@ func (hash Hash) String() string {
 	return hex.EncodeToString(hash)
 }
 
-func (hash Hash) Equals(h Hash) bool {
+func (hash Hash) Equal(h Hash) bool {
 	if len(hash) != 20 || len(h) != 20 {
 		panic("Hash has bad length")
 	}

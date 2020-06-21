@@ -153,7 +153,7 @@ func gotMetadata(t *Torrent, index, size uint32, data []byte) (bool, error) {
 
 	hsh := sha1.Sum(t.Info)
 	h := hash.Hash(hsh[:])
-	if !h.Equals(t.Hash) {
+	if !h.Equal(t.Hash) {
 		t.Info = nil
 		t.infoBitmap = nil
 		t.infoRequested = nil
