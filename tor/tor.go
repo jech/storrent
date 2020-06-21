@@ -24,6 +24,7 @@ import (
 	"github.com/jech/storrent/known"
 	"github.com/jech/storrent/peer"
 	"github.com/jech/storrent/pex"
+	"github.com/jech/storrent/path"
 	"github.com/jech/storrent/protocol"
 	"github.com/jech/storrent/tor/piece"
 	"github.com/jech/storrent/tracker"
@@ -73,7 +74,7 @@ type Torrent struct {
 
 // Torfile represents a file within a torrent.
 type Torfile struct {
-	Path    []string
+	Path    path.Path
 	Offset  int64 // offset within the torrent
 	Length  int64 // length of the file
 	Padding bool  // true if a padding file
@@ -994,7 +995,7 @@ outer:
 }
 
 type filechunk struct {
-	path       []string
+	path       path.Path
 	filelength int64
 	offset     int64
 	length     int64

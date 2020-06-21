@@ -7,7 +7,6 @@ import (
 	"hash/fnv"
 	"io"
 	"os"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"bazil.org/fuse/fs"
 
 	"github.com/jech/storrent/hash"
+	"github.com/jech/storrent/path"
 	"github.com/jech/storrent/tor"
 )
 
@@ -52,11 +52,13 @@ func (fs filesystem) Root() (fs.Node, error) {
 	return root(0), nil
 }
 
-// distinguish different torrents with same name
-func fileInode(hash hash.Hash, name string) uint64 {
+func fileInode(hash hash.Hash, path path.Path) uint64 {
 	h := fnv.New64a()
 	h.Write(hash)
-	h.Write([]byte(name))
+	for _, n := range path {
+		h.Write([]byte(n))
+		h.Write([]byte{0})
+	}
 	return h.Sum64()
 }
 
@@ -92,35 +94,12 @@ func (dir root) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 			ents = append(ents, fuse.Dirent{
 				Name:  t.Name,
 				Type:  tpe,
-				Inode: fileInode(t.Hash, ""),
+				Inode: fileInode(t.Hash, nil),
 			})
 		}
 		return true
 	})
 	return ents, nil
-}
-
-func toPath(s string) []string {
-	path := strings.Split(s, "/")
-	if len(path) > 0 && path[0] == "" {
-		path = path[1:]
-	}
-	if len(path) > 0 && path[len(path)-1] == "" {
-		path = path[0 : len(path)-1]
-	}
-	return path
-}
-
-func within(path []string, begin []string) bool {
-	if len(path) <= len(begin) {
-		return false
-	}
-	for i := range begin {
-		if path[i] != begin[i] {
-			return false
-		}
-	}
-	return true
 }
 
 type directory struct {
@@ -129,7 +108,7 @@ type directory struct {
 }
 
 func (dir directory) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Inode = fileInode(dir.t.Hash, dir.name)
+	a.Inode = fileInode(dir.t.Hash, path.Parse(dir.name))
 	a.Mode = os.ModeDir | 0555
 	if dir.t.CreationDate > 0 {
 		a.Mtime = time.Unix(dir.t.CreationDate, 0)
@@ -143,17 +122,15 @@ func (dir directory) Lookup(ctx context.Context, name string) (fs.Node, error) {
 		return nil, fuse.EIO
 	}
 
-	path := toPath(dir.name)
+	pth := path.Parse(dir.name)
 	for _, f := range dir.t.Files {
-		if within(f.Path, path) && f.Path[len(path)] == name {
-			n := name
-			if dir.name != "" {
-				n = dir.name + "/" + name
-			}
-			if len(f.Path) > len(path)+1 {
-				return directory{dir.t, n}, nil
+		if f.Path.Within(pth) && f.Path[len(pth)] == name {
+			p := append(path.Path(nil), pth...)
+			p = append(p, name)
+			if len(f.Path) > len(pth)+1 {
+				return directory{dir.t, p.String()}, nil
 			} else {
-				return file{dir.t, n}, nil
+				return file{dir.t, p.String()}, nil
 			}
 		}
 	}
@@ -165,7 +142,7 @@ func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 		return nil, fuse.EIO
 	}
 
-	path := toPath(dir.name)
+	pth := path.Parse(dir.name)
 
 	ents := make([]fuse.Dirent, 0)
 	dirs := make(map[string]bool)
@@ -173,12 +150,12 @@ func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 		if f.Padding {
 			continue
 		}
-		if !within(f.Path, path) {
+		if !f.Path.Within(pth) {
 			continue
 		}
-		name := f.Path[len(path)]
+		name := f.Path[len(pth)]
 		tpe := fuse.DT_File
-		if len(f.Path) > len(path)+1 {
+		if len(f.Path) > len(pth)+1 {
 			if dirs[name] {
 				continue
 			}
@@ -186,10 +163,9 @@ func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 			tpe = fuse.DT_Dir
 		}
 		ents = append(ents, fuse.Dirent{
-			Name: name,
-			Type: tpe,
-			Inode: fileInode(dir.t.Hash,
-				strings.Join(f.Path[:len(path)+1], "/")),
+			Name:  name,
+			Type:  tpe,
+			Inode: fileInode(dir.t.Hash, f.Path[:len(pth)+1]),
 		})
 	}
 	return ents, nil
@@ -200,9 +176,9 @@ type file struct {
 	name string
 }
 
-func findFile(t *tor.Torrent, name string) *tor.Torfile {
+func findFile(t *tor.Torrent, path path.Path) *tor.Torfile {
 	for _, f := range t.Files {
-		if strings.Join(f.Path, "/") == name {
+		if path.Equal(f.Path) {
 			return &f
 		}
 	}
@@ -214,21 +190,23 @@ func (file file) Attr(ctx context.Context, a *fuse.Attr) error {
 		return fuse.EIO
 	}
 
+	pth := path.Parse(file.name)
+
 	var size uint64
 	if file.t.Files == nil {
-		if file.name != "" {
+		if len(pth) > 0 {
 			return fuse.ENOENT
 		}
 		size = uint64(file.t.Pieces.Length())
 	} else {
-		f := findFile(file.t, file.name)
+		f := findFile(file.t, pth)
 		if f == nil {
 			return fuse.ENOENT
 		}
 		size = uint64(f.Length)
 	}
 
-	a.Inode = fileInode(file.t.Hash, file.name)
+	a.Inode = fileInode(file.t.Hash, pth)
 	a.Mode = 0444
 	a.Size = size
 	a.Blocks = (size + 511) / 512
@@ -244,8 +222,26 @@ type handle struct {
 	reader *tor.Reader
 }
 
-var cachedmu sync.Mutex
-var cached = make(map[string]hash.Hash)
+// Maps file names to torrent hashes, avoids cache corruption if two
+// torrents have the same name.
+var cached struct {
+	mu     sync.Mutex
+	cached map[string]hash.Hash
+}
+
+func cachedValid(name string, hsh hash.Hash) bool {
+	cached.mu.Lock()
+	defer cached.mu.Unlock()
+	if cached.cached == nil {
+		cached.cached = make(map[string]hash.Hash)
+	}
+	h, ok := cached.cached[name]
+	if ok && h.Equal(hsh) {
+		return true
+	}
+	cached.cached[name] = hsh
+	return false
+}
 
 func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	if !req.Flags.IsReadOnly() {
@@ -265,7 +261,7 @@ func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 		offset = 0
 		length = file.t.Pieces.Length()
 	} else {
-		f := findFile(file.t, file.name)
+		f := findFile(file.t, path.Parse(file.name))
 		if f == nil {
 			return nil, fuse.ENOENT
 		}
@@ -276,15 +272,8 @@ func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 	if reader == nil {
 		return nil, fuse.EIO
 	}
-	n := file.t.Name + "/" + file.name
-
-	cachedmu.Lock()
-	defer cachedmu.Unlock()
-	h, ok := cached[n]
-	if ok && h.Equal(file.t.Hash) {
+	if cachedValid(file.t.Name+"/"+file.name, file.t.Hash) {
 		resp.Flags |= fuse.OpenKeepCache
-	} else {
-		cached[n] = file.t.Hash
 	}
 
 	return handle{file, reader}, nil

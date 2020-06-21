@@ -21,6 +21,7 @@ import (
 	"github.com/jech/storrent/dht"
 	"github.com/jech/storrent/hash"
 	"github.com/jech/storrent/known"
+	"github.com/jech/storrent/path"
 	"github.com/jech/storrent/peer"
 	"github.com/jech/storrent/tor"
 	"github.com/jech/storrent/tracker"
@@ -50,18 +51,18 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := r.URL.Path
-	if path == "/" {
+	pth := r.URL.Path
+	if pth == "/" {
 		root(handler.ctx, w, r)
 		return
 	}
 
-	if len(path) < 41 {
+	if len(pth) < 41 {
 		http.NotFound(w, r)
 		return
 	}
 
-	hash := hash.Parse(path[1:41])
+	hash := hash.Parse(pth[1:41])
 	if hash == nil {
 		http.NotFound(w, r)
 		return
@@ -73,32 +74,32 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(path) == 41 {
-		http.Redirect(w, r, path+"/", 301)
+	if len(pth) == 41 {
+		http.Redirect(w, r, pth+"/", 301)
 		return
 	}
 
-	if path[41] == '/' {
+	if pth[41] == '/' {
 		err = r.ParseForm()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if r.Form["playlist"] != nil {
-			playlist(w, r, hash, toPath(path[42:]))
+			playlist(w, r, hash, path.Parse(pth[42:]))
 			return
 		}
-		if path[len(path)-1] == '/' {
-			directory(w, r, hash, toPath(path[42:]))
+		if pth[len(pth)-1] == '/' {
+			directory(w, r, hash, path.Parse(pth[42:]))
 			return
 		} else {
-			file(w, r, hash, toPath(path[42:]))
+			file(w, r, hash, path.Parse(pth[42:]))
 			return
 		}
 	}
 
-	if path[41] == '.' {
-		extension := path[42:]
+	if pth[41] == '.' {
+		extension := pth[42:]
 		if extension == "torrent" {
 			torfile(w, r)
 			return
@@ -253,22 +254,6 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func less(a []string, b []string) bool {
-	for i := range a {
-		if i >= len(b) {
-			return false
-		}
-		if a[i] < b[i] {
-			return true
-		}
-		if a[i] > b[i] {
-			return false
-		}
-	}
-
-	return len(a) < len(b)
-}
-
 func header(w http.ResponseWriter, r *http.Request, title string) bool {
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	w.Header().Set("cache-control", "no-cache")
@@ -291,19 +276,7 @@ func footer(w http.ResponseWriter) {
 	fmt.Fprintf(w, "</body></html>\n")
 }
 
-func toPath(s string) []string {
-	path := strings.Split(s, "/")
-	if len(path) > 0 && path[0] == "" {
-		path = path[1:]
-	}
-	if len(path) > 0 && path[len(path)-1] == "" {
-		path = path[0 : len(path)-1]
-	}
-	return path
-}
-
-func directory(w http.ResponseWriter, r *http.Request,
-	hash hash.Hash, path []string) {
+func directory(w http.ResponseWriter, r *http.Request, hash hash.Hash, pth path.Path) {
 
 	ctx := r.Context()
 
@@ -317,38 +290,14 @@ func directory(w http.ResponseWriter, r *http.Request,
 	if done {
 		return
 	}
-	err := torrentEntry(ctx, w, t, path)
+	err := torrentEntry(ctx, w, t, pth)
 	if err != nil {
 		return
 	}
 	footer(w)
 }
 
-func equal(p1 []string, p2 []string) bool {
-	if len(p1) != len(p2) {
-		return false
-	}
-	for i := range p1 {
-		if p1[i] != p2[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func within(path []string, begin []string) bool {
-	if len(path) <= len(begin) {
-		return false
-	}
-	for i := range begin {
-		if path[i] != begin[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func pathUrl(p []string) string {
+func pathUrl(p path.Path) string {
 	var b []byte
 	for _, s := range p {
 		t := url.PathEscape(s)
@@ -358,38 +307,36 @@ func pathUrl(p []string) string {
 	return string(b[0 : len(b)-1])
 }
 
-func torrentFile(w io.Writer, hash hash.Hash, path []string, length int64,
-	available int) {
+func torrentFile(w io.Writer, hash hash.Hash, path path.Path, length int64, available int) {
 	p := pathUrl(path)
 	fmt.Fprintf(w,
 		"<tr><td><a href=\"/%v/%v\">%v</a></td>"+
 			"<td>%v</td><td>%v</td></tr>\n",
-		hash, p, html.EscapeString(strings.Join(path, "/")),
+		hash, p, html.EscapeString(path.String()),
 		length, available)
 }
 
-func torrentDir(w io.Writer, hash hash.Hash, path []string, lastdir []string) {
-	var dir []string
-	for i := 0; i < len(path) && i < len(lastdir); i++ {
-		if path[i] != lastdir[i] {
+func torrentDir(w io.Writer, hash hash.Hash, pth path.Path, lastdir path.Path) {
+	var dir path.Path
+	for i := 0; i < len(pth) && i < len(lastdir); i++ {
+		if pth[i] != lastdir[i] {
 			break
 		}
-		dir = append(dir, path[i])
+		dir = append(dir, pth[i])
 	}
-	for i := len(dir); i < len(path); i++ {
-		dir = append(dir, path[i])
+	for i := len(dir); i < len(pth); i++ {
+		dir = append(dir, pth[i])
 		p := pathUrl(dir)
 		fmt.Fprintf(w,
 			"<tr><td><a href=\"/%v/%v/\">%v/</a></td><td>"+
 				"(<a href=\"/%v/%v/?playlist\">playlist</a>)"+
 				"</td></tr>\n",
-			hash, p, html.EscapeString(strings.Join(dir, "/")),
+			hash, p, html.EscapeString(dir.String()),
 			hash, p)
 	}
 }
 
-func torrentEntry(ctx context.Context, w http.ResponseWriter,
-	t *tor.Torrent, dir []string) error {
+func torrentEntry(ctx context.Context, w http.ResponseWriter, t *tor.Torrent, dir path.Path) error {
 	hash := t.Hash
 	name := t.Name
 	if !t.InfoComplete() {
@@ -425,7 +372,7 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter,
 		}
 		if len(dir) == 0 {
 			available, _ := t.GetAvailable()
-			torrentFile(w, t.Hash, []string{t.Name},
+			torrentFile(w, t.Hash, path.Parse(t.Name),
 				t.Pieces.Length(),
 				available.AvailableRange(t,
 					0, t.Pieces.Length()))
@@ -433,14 +380,14 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter,
 	} else {
 		a := make([]int, 0, len(t.Files))
 		for i := range t.Files {
-			if within(t.Files[i].Path, dir) {
+			if t.Files[i].Path.Within(dir) {
 				a = append(a, i)
 			}
 		}
 		sort.Slice(a, func(i, j int) bool {
-			return less(t.Files[a[i]].Path, t.Files[a[j]].Path)
+			return t.Files[a[i]].Path.Less(t.Files[a[j]].Path)
 		})
-		lastdir := []string{}
+		var lastdir path.Path
 		available, _ := t.GetAvailable()
 		for _, i := range a {
 			if err := ctx.Err(); err != nil {
@@ -449,7 +396,7 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter,
 			f := t.Files[i]
 			path := f.Path
 			dir := path[:len(path)-1]
-			if !equal(dir, lastdir) {
+			if !dir.Equal(lastdir) {
 				torrentDir(w, t.Hash, dir, lastdir)
 				lastdir = dir
 			}
@@ -522,7 +469,7 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 				bytes.Compare(tors[i].Hash, tors[j].Hash) < 0)
 	})
 	for _, t := range tors {
-		err := torrentEntry(ctx, w, t, []string{})
+		err := torrentEntry(ctx, w, t, path.Path(nil))
 		if err != nil {
 			return
 		}
@@ -790,7 +737,7 @@ func hknown(w http.ResponseWriter, kp *known.Peer, t *tor.Torrent) {
 	var flags string
 	if buf.Len() > 2 {
 		b := buf.Bytes()
-		flags = string(b[0:len(b) - 2])
+		flags = string(b[0 : len(b)-2])
 	} else {
 		flags = buf.String()
 	}
@@ -836,15 +783,14 @@ func torfile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func m3uentry(w http.ResponseWriter, host string, hash hash.Hash, path []string) {
+func m3uentry(w http.ResponseWriter, host string, hash hash.Hash, path path.Path) {
 	fmt.Fprintf(w, "#EXTINF:-1,%v\n",
 		strings.Replace(path[len(path)-1], ",", "", -1))
 	fmt.Fprintf(w, "http://%v/%v/%v\n",
 		host, hash, pathUrl(path))
 }
 
-func playlist(w http.ResponseWriter, r *http.Request,
-	hash hash.Hash, dir []string) {
+func playlist(w http.ResponseWriter, r *http.Request, hash hash.Hash, dir path.Path) {
 
 	t := tor.Get(hash)
 	if t == nil {
@@ -866,7 +812,7 @@ func playlist(w http.ResponseWriter, r *http.Request,
 	} else {
 		var found bool
 		for _, f := range t.Files {
-			if within(f.Path, dir) {
+			if f.Path.Within(dir) {
 				found = true
 				break
 			}
@@ -885,26 +831,25 @@ func playlist(w http.ResponseWriter, r *http.Request,
 
 	fmt.Fprintf(w, "#EXTM3U\n")
 	if t.Files == nil {
-		m3uentry(w, r.Host, hash, []string{t.Name})
+		m3uentry(w, r.Host, hash, path.Parse(t.Name))
 	} else {
 		a := make([]int, len(t.Files))
 		for i := range a {
 			a[i] = i
 		}
 		sort.Slice(a, func(i, j int) bool {
-			return less(t.Files[a[i]].Path,
-				t.Files[a[j]].Path)
+			return t.Files[a[i]].Path.Less(t.Files[a[j]].Path)
 		})
 		for _, i := range a {
 			path := t.Files[i].Path
-			if within(path, dir) {
+			if path.Within(dir) {
 				m3uentry(w, r.Host, hash, path)
 			}
 		}
 	}
 }
 
-func file(w http.ResponseWriter, r *http.Request, hash hash.Hash, path []string) {
+func file(w http.ResponseWriter, r *http.Request, hash hash.Hash, path path.Path) {
 	t := tor.Get(hash)
 	if t == nil {
 		http.NotFound(w, r)
@@ -932,15 +877,14 @@ func file(w http.ResponseWriter, r *http.Request, hash hash.Hash, path []string)
 
 	reader := t.NewReader(r.Context(), offset, length)
 	defer reader.Close()
-	http.ServeContent(w, r, strings.Join(path, "/"), time.Time{}, reader)
+	http.ServeContent(w, r, path.String(), time.Time{}, reader)
 }
 
-func fileParms(t *tor.Torrent, hash hash.Hash,
-	path []string) (offset int64, length int64, etag string, err error) {
+func fileParms(t *tor.Torrent, hash hash.Hash, pth path.Path) (offset int64, length int64, etag string, err error) {
 	var file *tor.Torfile
 
 	if t.Files == nil {
-		if len(path) != 1 || path[0] != t.Name {
+		if len(pth) != 1 || pth[0] != t.Name {
 			err = os.ErrNotExist
 			return
 		}
@@ -948,7 +892,7 @@ func fileParms(t *tor.Torrent, hash hash.Hash,
 		length = t.Pieces.Length()
 	} else {
 		for _, f := range t.Files {
-			if equal(path, f.Path) {
+			if pth.Equal(f.Path) {
 				file = &f
 				break
 			}

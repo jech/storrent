@@ -15,6 +15,7 @@ import (
 	"github.com/jech/storrent/config"
 	"github.com/jech/storrent/hash"
 	"github.com/jech/storrent/httpclient"
+	"github.com/jech/storrent/path"
 	"github.com/jech/storrent/tracker"
 	"github.com/jech/storrent/webseed"
 )
@@ -41,10 +42,10 @@ type BInfo struct {
 
 // BFile is a file entry in a torrent file.
 type BFile struct {
-	Path   []string `bencode:"path"`
-	Path8  []string `bencode:"path.utf-8,omitempty"`
-	Length int64    `bencode:"length"`
-	Attr   string   `bencode:"attr,omitempty"`
+	Path   path.Path `bencode:"path"`
+	Path8  path.Path `bencode:"path.utf-8,omitempty"`
+	Length int64     `bencode:"length"`
+	Attr   string    `bencode:"attr,omitempty"`
 }
 
 // listOrString is an array of strings.  It may unmarshal from either
