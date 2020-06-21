@@ -64,9 +64,21 @@ func fileInode(hash hash.Hash, path path.Path) uint64 {
 
 type root int
 
+func setuid(a *fuse.Attr) {
+	uid := os.Getuid()
+	if uid >= 0 {
+		a.Uid = uint32(uid)
+	}
+	gid := os.Getgid()
+	if gid >= 0 {
+		a.Gid = uint32(gid)
+	}
+}
+
 func (dir root) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 1
 	a.Mode = os.ModeDir | 0555
+	setuid(a)
 	return nil
 }
 
@@ -110,6 +122,7 @@ type directory struct {
 func (dir directory) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = fileInode(dir.t.Hash, path.Parse(dir.name))
 	a.Mode = os.ModeDir | 0555
+	setuid(a)
 	if dir.t.CreationDate > 0 {
 		a.Mtime = time.Unix(dir.t.CreationDate, 0)
 		a.Ctime = time.Unix(dir.t.CreationDate, 0)
@@ -224,6 +237,7 @@ func (file file) Attr(ctx context.Context, a *fuse.Attr) error {
 
 	a.Inode = fileInode(file.t.Hash, pth)
 	a.Mode = 0444
+	setuid(a)
 	a.Size = size
 	a.Blocks = (size + 511) / 512
 	if file.t.CreationDate > 0 {
