@@ -88,11 +88,14 @@ func (dir root) Lookup(ctx context.Context, name string) (fs.Node, error) {
 		return nil, fuse.ENOENT
 	}
 
+	var h [20]byte
+	copy(h[:], t.Hash)
+
 	if t.Files == nil {
-		return file{t: t}, nil
+		return file{hash: h}, nil
 	}
 
-	return directory{t: t}, nil
+	return directory{hash: h}, nil
 }
 
 func (dir root) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
@@ -115,35 +118,50 @@ func (dir root) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 }
 
 type directory struct {
-	t    *tor.Torrent
+	hash [20]byte
 	name string
 }
 
+func (dir directory) Hash() hash.Hash {
+	h := hash.Hash(make([]byte, 20))
+	copy(h, dir.hash[:])
+	return h
+}
+
 func (dir directory) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Inode = fileInode(dir.t.Hash, path.Parse(dir.name))
+	t := tor.Get(dir.Hash())
+	if t == nil || !t.InfoComplete() {
+		return fuse.ENOENT
+	}
+
+	a.Inode = fileInode(dir.Hash(), path.Parse(dir.name))
 	a.Mode = os.ModeDir | 0555
 	setuid(a)
-	if dir.t.CreationDate > 0 {
-		a.Mtime = time.Unix(dir.t.CreationDate, 0)
-		a.Ctime = time.Unix(dir.t.CreationDate, 0)
+	if t.CreationDate > 0 {
+		a.Mtime = time.Unix(t.CreationDate, 0)
+		a.Ctime = time.Unix(t.CreationDate, 0)
 	}
 	return nil
 }
 
 func (dir directory) Lookup(ctx context.Context, name string) (fs.Node, error) {
-	if !dir.t.InfoComplete() {
-		return nil, fuse.EIO
+	t := tor.Get(dir.Hash())
+	if t == nil || !t.InfoComplete() {
+		return nil, fuse.ENOENT
 	}
 
+	var h [20]byte
+	copy(h[:], t.Hash)
+
 	pth := path.Parse(dir.name)
-	for _, f := range dir.t.Files {
+	for _, f := range t.Files {
 		if f.Path.Within(pth) && f.Path[len(pth)] == name {
 			p := append(path.Path(nil), pth...)
 			p = append(p, name)
 			if len(f.Path) > len(pth)+1 {
-				return directory{dir.t, p.String()}, nil
+				return directory{h, p.String()}, nil
 			} else {
-				return file{dir.t, p.String()}, nil
+				return file{h, p.String()}, nil
 			}
 		}
 	}
@@ -151,8 +169,9 @@ func (dir directory) Lookup(ctx context.Context, name string) (fs.Node, error) {
 }
 
 func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
-	if !dir.t.InfoComplete() {
-		return nil, fuse.EIO
+	t := tor.Get(dir.Hash())
+	if t == nil || !t.InfoComplete() {
+		return nil, fuse.ENOENT
 	}
 
 	pth := path.Parse(dir.name)
@@ -162,11 +181,11 @@ func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	ents = append(ents, fuse.Dirent{
 		Name:  ".",
 		Type:  fuse.DT_Dir,
-		Inode: fileInode(dir.t.Hash, pth),
+		Inode: fileInode(t.Hash, pth),
 	})
 	parentInode := uint64(1)
 	if len(pth) > 0 {
-		parentInode = fileInode(dir.t.Hash, pth[:len(pth)-1])
+		parentInode = fileInode(t.Hash, pth[:len(pth)-1])
 	}
 	ents = append(ents, fuse.Dirent{
 		Name:  "..",
@@ -175,7 +194,7 @@ func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	})
 
 	dirs := make(map[string]bool)
-	for _, f := range dir.t.Files {
+	for _, f := range t.Files {
 		if f.Padding {
 			continue
 		}
@@ -194,15 +213,21 @@ func (dir directory) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 		ents = append(ents, fuse.Dirent{
 			Name:  name,
 			Type:  tpe,
-			Inode: fileInode(dir.t.Hash, f.Path[:len(pth)+1]),
+			Inode: fileInode(t.Hash, f.Path[:len(pth)+1]),
 		})
 	}
 	return ents, nil
 }
 
 type file struct {
-	t    *tor.Torrent
+	hash [20]byte
 	name string
+}
+
+func (file file) Hash() hash.Hash {
+	h := hash.Hash(make([]byte, 20))
+	copy(h, file.hash[:])
+	return h
 }
 
 func findFile(t *tor.Torrent, path path.Path) *tor.Torfile {
@@ -215,34 +240,35 @@ func findFile(t *tor.Torrent, path path.Path) *tor.Torfile {
 }
 
 func (file file) Attr(ctx context.Context, a *fuse.Attr) error {
-	if !file.t.InfoComplete() {
-		return fuse.EIO
+	t := tor.Get(file.Hash())
+	if t == nil || !t.InfoComplete() {
+		return fuse.ENOENT
 	}
 
 	pth := path.Parse(file.name)
 
 	var size uint64
-	if file.t.Files == nil {
+	if t.Files == nil {
 		if len(pth) > 0 {
 			return fuse.ENOENT
 		}
-		size = uint64(file.t.Pieces.Length())
+		size = uint64(t.Pieces.Length())
 	} else {
-		f := findFile(file.t, pth)
+		f := findFile(t, pth)
 		if f == nil {
 			return fuse.ENOENT
 		}
 		size = uint64(f.Length)
 	}
 
-	a.Inode = fileInode(file.t.Hash, pth)
+	a.Inode = fileInode(t.Hash, pth)
 	a.Mode = 0444
 	setuid(a)
 	a.Size = size
 	a.Blocks = (size + 511) / 512
-	if file.t.CreationDate > 0 {
-		a.Mtime = time.Unix(file.t.CreationDate, 0)
-		a.Ctime = time.Unix(file.t.CreationDate, 0)
+	if t.CreationDate > 0 {
+		a.Mtime = time.Unix(t.CreationDate, 0)
+		a.Ctime = time.Unix(t.CreationDate, 0)
 	}
 	return nil
 }
@@ -274,35 +300,36 @@ func cachedValid(name string, hsh hash.Hash) bool {
 }
 
 func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	t := tor.Get(file.Hash())
+	if t == nil || !t.InfoComplete() {
+		return nil, fuse.ENOENT
+	}
+
 	if !req.Flags.IsReadOnly() {
 		return nil, fuse.Errno(syscall.EACCES)
 	}
 
-	if !file.t.InfoComplete() {
-		return nil, fuse.EIO
-	}
-
 	var offset, length int64
 
-	if file.t.Files == nil {
+	if t.Files == nil {
 		if file.name != "" {
 			return nil, fuse.ENOENT
 		}
 		offset = 0
-		length = file.t.Pieces.Length()
+		length = t.Pieces.Length()
 	} else {
-		f := findFile(file.t, path.Parse(file.name))
+		f := findFile(t, path.Parse(file.name))
 		if f == nil {
 			return nil, fuse.ENOENT
 		}
 		offset = f.Offset
 		length = f.Length
 	}
-	reader := file.t.NewReader(context.Background(), offset, length)
+	reader := t.NewReader(context.Background(), offset, length)
 	if reader == nil {
 		return nil, fuse.EIO
 	}
-	if cachedValid(file.t.Name+"/"+file.name, file.t.Hash) {
+	if cachedValid(t.Name+"/"+file.name, t.Hash) {
 		resp.Flags |= fuse.OpenKeepCache
 	}
 
