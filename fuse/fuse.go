@@ -290,10 +290,8 @@ func (handle handle) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse
 	resp.Data = resp.Data[:req.Size]
 	n, err := io.ReadFull(handle.reader, resp.Data)
 	resp.Data = resp.Data[:n]
-	if err == tor.ErrTorrentDead {
-		err = fuse.ESTALE
-	} else if err == io.ErrUnexpectedEOF {
-		err = io.EOF
+	if n > 0 || err == io.EOF || err == io.ErrUnexpectedEOF {
+		err = nil
 	}
 	return err
 }
