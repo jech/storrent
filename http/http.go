@@ -75,6 +75,11 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(pth) == 41 {
+		t := tor.Get(hash)
+		if t == nil {
+			http.NotFound(w, r)
+			return
+		}
 		http.Redirect(w, r, pth+"/", 301)
 		return
 	}
