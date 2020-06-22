@@ -23,6 +23,8 @@ func Serve(mountpoint string) error {
 		mountpoint,
 		fuse.Subtype("storrent"),
 		fuse.ReadOnly(),
+		fuse.MaxReadahead(128*1024),
+		fuse.AsyncRead(),
 	)
 	if err != nil {
 		return err
@@ -271,7 +273,11 @@ func (file file) Attr(ctx context.Context, a *fuse.Attr) error {
 }
 
 type handle struct {
-	file   file
+	file file
+
+	// using a semaphore here gives better ordering than a mutex.
+	// Another benefit is to avoid polluting the mutex profile.
+	sema   chan struct{}
 	reader *tor.Reader
 }
 
@@ -305,16 +311,30 @@ func (file file) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 
 	resp.Flags |= fuse.OpenKeepCache
 
-	return handle{file, reader}, nil
+	return &handle{
+		file:   file,
+		reader: reader,
+		sema:   make(chan struct{}, 1),
+	}, nil
 }
 
-func (handle handle) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+func (handle *handle) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	select {
+	case <-ctx.Done():
+		return fuse.EINTR
+	case handle.sema <- struct{}{}:
+	}
+	defer func() {
+		<-handle.sema
+	}()
+
 	_, err := handle.reader.Seek(req.Offset, io.SeekStart)
 	if err != nil {
 		return err
 	}
 
 	handle.reader.SetContext(ctx)
+	defer handle.reader.SetContext(context.Background())
 
 	resp.Data = resp.Data[:req.Size]
 	n, err := io.ReadFull(handle.reader, resp.Data)
@@ -325,6 +345,13 @@ func (handle handle) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse
 	return err
 }
 
-func (handle handle) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
-	return handle.reader.Close()
+func (handle *handle) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
+	handle.sema <- struct{}{}
+	defer func() {
+		<-handle.sema
+	}()
+
+	err := handle.reader.Close()
+	handle.reader = nil
+	return err
 }
