@@ -22,9 +22,9 @@ import (
 	"github.com/jech/storrent/dht"
 	"github.com/jech/storrent/hash"
 	"github.com/jech/storrent/known"
+	"github.com/jech/storrent/path"
 	"github.com/jech/storrent/peer"
 	"github.com/jech/storrent/pex"
-	"github.com/jech/storrent/path"
 	"github.com/jech/storrent/protocol"
 	"github.com/jech/storrent/tor/piece"
 	"github.com/jech/storrent/tracker"
@@ -329,33 +329,9 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		c.Ch <- available
 		close(c.Ch)
 	case peer.TorDropPeer:
-		seed := t.Pieces.Bitmap().All(t.Pieces.Num())
-		var q *peer.Peer
-		ps := t.rand.Perm(len(t.peers))
-		for _, pn := range ps {
-			p := t.peers[pn]
-			if seed {
-				s := p.GetStatus()
-				if s == nil || s.Seed || s.UploadOnly {
-					q = p
-					break
-				}
-			}
-			port := p.GetPort()
-			if port > 0 {
-				kp := known.Find(t.known, p.IP, port, nil, "",
-					known.None)
-				if kp != nil {
-					tm := time.Since(kp.ActiveTime)
-					if tm > 5*time.Minute {
-						q = p
-						break
-					}
-				}
-			}
-		}
-		if q != nil {
-			writePeer(q, peer.PeerDone{})
+		p := findIdlePeer(t)
+		if p != nil {
+			writePeer(p, peer.PeerDone{})
 			c.Ch <- true
 		} else {
 			c.Ch <- false
@@ -1549,6 +1525,33 @@ func (t *Torrent) AddKnown(ip net.IP, port int, id hash.Hash, version string,
 	case <-t.Done:
 		return ErrTorrentDead
 	}
+}
+
+func findIdlePeer(t *Torrent) *peer.Peer {
+	seed := t.Pieces.All()
+	ps := t.rand.Perm(len(t.peers))
+	for _, pn := range ps {
+		p := t.peers[pn]
+		if seed {
+			s := p.GetStatus()
+			if s == nil || s.Seed || s.UploadOnly {
+				return p
+			}
+		}
+		port := p.GetPort()
+		if port <= 0 {
+			continue
+		}
+		kp := known.Find(t.known, p.IP, port, nil, "", known.None)
+		if kp != nil {
+			tm := time.Since(kp.ActiveTime)
+			if tm > 5*time.Minute {
+				return p
+			}
+		}
+	}
+	return nil
+
 }
 
 // BadPeer is called when a peer participated in a failed piece.

@@ -150,6 +150,18 @@ func (ps *Pieces) Bitmap() bitmap.Bitmap {
 	return b
 }
 
+// All returns true if all pieces are complete.
+func (ps *Pieces) All() bool {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	for i := range ps.pieces {
+		if !ps.pieces[i].complete() {
+			return false
+		}
+	}
+	return true
+}
+
 // Complete returns true if a given piece is complete.
 func (ps *Pieces) Complete(n uint32) bool {
 	return ps.pieces[n].Complete()
