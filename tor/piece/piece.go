@@ -142,8 +142,8 @@ func (ps *Pieces) Bitmap() bitmap.Bitmap {
 	b := bitmap.New(len(ps.pieces))
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	for i, p := range ps.pieces {
-		if p.complete() {
+	for i := range ps.pieces {
+		if ps.pieces[i].complete() {
 			b.Set(i)
 		}
 	}
