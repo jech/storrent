@@ -7,6 +7,6 @@ require (
 	github.com/jackpal/gateway v1.0.6
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/zeebo/bencode v1.0.0
-	golang.org/x/net v0.0.0-20200602114024-627f9648deb9
-	golang.org/x/sys v0.0.0-20200610111108-226ff32320da
+	golang.org/x/net v0.0.0-20200904194848-62affa334b73
+	golang.org/x/sys v0.0.0-20200918174421-af09f7315aff
 )
