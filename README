@@ -42,11 +42,23 @@ By default, storrent takes 1/2 of the total RAM on your machine.  You may
 tune this with the `-mem` command-line flag:
 
     storrent -mem $((4 * 1024 * 1024)) &
-    
+
+By default, storrent attempts to open ports in your NAT box or firewall
+using NAT-PMP.  If your router doesn't support NAT-PMP, you can avoid some
+annoying error messages:
+
+    storrent -portmap=false
+
 I usually run storrent in a slightly more paranoid mode than the default:
 
     storrent -encryption 5 -dht-passive
-    
+
+For privacy reasons, storrent doesn't use trackers or webseeds by default;
+you may enable them on a torrent-by-torrent basis in the user interface.
+You may override the default from the command line:
+
+    storrent -use-trackers -user webseeds
+
 
 Author
 ------
