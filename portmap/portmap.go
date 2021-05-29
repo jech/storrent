@@ -222,6 +222,7 @@ func domap(ctx context.Context, proto string, kind int) {
 					config.ProtocolPort, res.externalPort)
 			}
 		}
+		config.SetExternalIPv4Port(config.ProtocolPort, proto == "tcp")
 		client = nil
 	}
 	defer unmap()
@@ -251,6 +252,8 @@ func domap(ctx context.Context, proto string, kind int) {
 			client = nil
 			continue
 		}
+
+		config.SetExternalIPv4Port(int(res.externalPort), proto == "tcp")
 
 		log.Printf("Mapped %v: %v->%v, %v",
 			proto, config.ProtocolPort,
