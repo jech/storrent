@@ -105,34 +105,60 @@ func (c *upnpClient) AddPortMapping(protocol string, port, externalPort int, lif
 		return portmapResult{}, errors.New("unknown protocol")
 	}
 
-	if lifetime > 0 {
-		ip, err := getMyIP()
-		if err != nil {
-			return portmapResult{}, err
-		}
+	myip, err := getMyIP()
+	if err != nil {
+		return portmapResult{}, err
+	}
 
-		err = (*ig1.WANIPConnection1)(c).AddPortMapping(
-			"", uint16(externalPort), prot,
-			uint16(port), ip.String(), true,
+	ipc := (*ig1.WANIPConnection1)(c)
+
+	// Find a free port
+	ep := externalPort
+	ok := false
+	for ep < 65535 {
+		p, c, e, d, l, err :=
+			ipc.GetSpecificPortMappingEntry("", uint16(ep), prot)
+		if err != nil || e == false || l <= 0 {
+			ok = true
+			break
+		}
+		a := net.ParseIP(c)
+		if a.Equal(myip) && int(p) == port && d == "STorrent" {
+			ok = true
+			break
+		}
+		if lifetime == 0 {
+			return portmapResult{},
+				errors.New("couldn't find mapping to delete")
+		}
+		ep++
+	}
+
+	if !ok {
+		return portmapResult{}, errors.New("couldn't find free port")
+	}
+
+	if lifetime > 0 {
+		err = ipc.AddPortMapping(
+			"", uint16(ep), prot,
+			uint16(port), myip.String(), true,
 			"STorrent", uint32(lifetime),
 		)
 		if err != nil {
 			return portmapResult{}, err
 		}
 		return portmapResult{
-			externalPort: uint16(externalPort),
+			externalPort: uint16(ep),
 			lifetime:     uint32(lifetime),
 		}, nil
 	}
 
-	err := (*ig1.WANIPConnection1)(c).DeletePortMapping(
-		"", uint16(externalPort), prot,
-	)
+	err = ipc.DeletePortMapping("", uint16(ep), prot)
 	if err != nil {
 		return portmapResult{}, err
 	}
 	return portmapResult{
-		externalPort: uint16(externalPort),
+		externalPort: uint16(ep),
 		lifetime:     0,
 	}, nil
 }
