@@ -35,7 +35,7 @@ import (
 func main() {
 	var proxyURL, mountpoint string
 	var cpuprofile, memprofile, mutexprofile, tracefile string
-	var doPortmap bool
+	var doPortmap string
 
 	mem, err := physmem.Total()
 	if err != nil {
@@ -62,7 +62,7 @@ func main() {
 	flag.StringVar(&tracefile, "trace", "",
 		"Execution trace `filename`.")
 	flag.StringVar(&proxyURL, "proxy", "",
-		"`URL` of a proxy to use for BitTorrent and tracker traffic.\n" +
+		"`URL` of a proxy to use for BitTorrent and tracker traffic.\n"+
 			"For tor, use \"socks5://127.0.0.1:9050\" and disable the DHT.")
 	flag.StringVar(&mountpoint, "mountpoint", "",
 		"FUSE `mountpoint`.")
@@ -76,7 +76,7 @@ func main() {
 		"Prefetch `rate` in bytes per second.")
 	flag.IntVar(&config.DefaultEncryption, "encryption", 2,
 		"Encryption `level` (0 = never, 2 = default, 5 = always)")
-	flag.BoolVar(&doPortmap, "portmap", true, "perform NAT port mapping.")
+	flag.StringVar(&doPortmap, "portmap", "auto", "NAT port mappping (natpmp, upnp, auto, or off)")
 	flag.BoolVar(&config.Debug, "debug", false,
 		"Log all BitTorrent messages.")
 
@@ -185,9 +185,23 @@ func main() {
 		}
 	}(portmapdone)
 
-	if doPortmap {
+	pmkind := 0
+	switch doPortmap {
+	case "off":
+		pmkind = 0
+	case "natpmp":
+		pmkind = portmap.NATPMP
+	case "upnp":
+		pmkind = portmap.UPNP
+	case "auto":
+		pmkind = portmap.All
+	default:
+		log.Printf("Unknown portmapping kind %v", doPortmap)
+	}
+
+	if pmkind != 0 {
 		go func() {
-			err := portmap.Map(ctx)
+			err := portmap.Map(ctx, pmkind)
 			if err != nil {
 				log.Println(err)
 			}
