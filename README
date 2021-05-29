@@ -16,7 +16,7 @@ please do not get offended if I don't listen to your feature requests.
 Installation
 ------------
 
-    go install github.com/jech/storrent
+    go install github.com/jech/storrent@latest
 
 
 Running
