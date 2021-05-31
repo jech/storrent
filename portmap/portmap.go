@@ -1,3 +1,5 @@
+// Package portmap implements port mapping using NAT-PMP or uPNP.
+
 package portmap
 
 import (
@@ -21,17 +23,15 @@ const (
 	All    = NATPMP | UPNP
 )
 
-type portmapResult struct {
-	externalPort uint16
-	lifetime     uint32
-}
-
 type portmapClient interface {
-	AddPortMapping(protocol string, port, externalPort int, lifetime int) (portmapResult, error)
+	AddPortMapping(protocol string, port, externalPort int, lifetime int) (int, int, error)
 }
 
+// natpmpClient implements portmapClient for NAT-PMP.
 type natpmpClient natpmp.Client
 
+// newNatpmpClient attempts to contact the NAT-PMP client on the default
+// gateway and returns a natpmpClient structure if successful.
 func newNatpmpClient() (*natpmpClient, error) {
 	g, err := gateway.DiscoverGateway()
 	if err != nil {
@@ -50,20 +50,22 @@ func newNatpmpClient() (*natpmpClient, error) {
 	return (*natpmpClient)(c), nil
 }
 
-func (c *natpmpClient) AddPortMapping(protocol string, port, externalPort int, lifetime int) (portmapResult, error) {
+// AddPortMapping maps a port for the given lifetime.  It returns the
+// allocated external port, which might be different from the port
+// requested, and a lifetime in seconds.
+func (c *natpmpClient) AddPortMapping(protocol string, port, externalPort int, lifetime int) (int, int, error) {
 	r, err := (*natpmp.Client)(c).AddPortMapping(protocol, port, externalPort, lifetime)
 	if err != nil {
-		return portmapResult{}, err
+		return 0, 0, err
 	}
-	result := portmapResult{
-		externalPort: r.MappedExternalPort,
-		lifetime:     r.PortMappingLifetimeInSeconds,
-	}
-	return result, nil
+	return int(r.MappedExternalPort), int(r.PortMappingLifetimeInSeconds), nil
 }
 
+// upnpClient implements portmapClient for uPNP.
 type upnpClient ig1.WANIPConnection1
 
+// newUpnpClient attempts to discover a WAN IP Connection client on the
+// local network.  If more than one are found, it returns an arbitrary one.
 func newUpnpClient() (*upnpClient, error) {
 	clients, errs, err := ig1.NewWANIPConnection1Clients()
 	if err != nil {
@@ -79,7 +81,8 @@ func newUpnpClient() (*upnpClient, error) {
 	return (*upnpClient)(clients[0]), nil
 }
 
-func getMyIP() (net.IP, error) {
+// getMyIPv4 returns the local IPv4 address used by the default route.
+func getMyIPv4() (net.IP, error) {
 	conn, err := net.Dial("udp", "8.8.8.8:53")
 	if err != nil {
 		return nil, err
@@ -94,7 +97,11 @@ func getMyIP() (net.IP, error) {
 	return localAddr.IP, nil
 }
 
-func (c *upnpClient) AddPortMapping(protocol string, port, externalPort int, lifetime int) (portmapResult, error) {
+// AddPortMapping attempts to create a mapping for the given port.  If
+// successful, it returns the allocated external port, which might be
+// different from the requested port if the latter was alredy allocated by
+// a different host, and a lifetime in seconds.
+func (c *upnpClient) AddPortMapping(protocol string, port, externalPort int, lifetime int) (int, int, error) {
 	var prot string
 	switch protocol {
 	case "tcp":
@@ -102,12 +109,12 @@ func (c *upnpClient) AddPortMapping(protocol string, port, externalPort int, lif
 	case "udp":
 		prot = "UDP"
 	default:
-		return portmapResult{}, errors.New("unknown protocol")
+		return 0, 0, errors.New("unknown protocol")
 	}
 
-	myip, err := getMyIP()
+	myip, err := getMyIPv4()
 	if err != nil {
-		return portmapResult{}, err
+		return 0, 0, err
 	}
 
 	ipc := (*ig1.WANIPConnection1)(c)
@@ -128,14 +135,13 @@ func (c *upnpClient) AddPortMapping(protocol string, port, externalPort int, lif
 			break
 		}
 		if lifetime == 0 {
-			return portmapResult{},
-				errors.New("couldn't find mapping to delete")
+			return 0, 0, errors.New("mapping not found")
 		}
 		ep++
 	}
 
 	if !ok {
-		return portmapResult{}, errors.New("couldn't find free port")
+		return 0, 0, errors.New("couldn't find free port")
 	}
 
 	if lifetime > 0 {
@@ -145,24 +151,20 @@ func (c *upnpClient) AddPortMapping(protocol string, port, externalPort int, lif
 			"STorrent", uint32(lifetime),
 		)
 		if err != nil {
-			return portmapResult{}, err
+			return 0, 0, err
 		}
-		return portmapResult{
-			externalPort: uint16(ep),
-			lifetime:     uint32(lifetime),
-		}, nil
+		return ep, lifetime, nil
 	}
 
 	err = ipc.DeletePortMapping("", uint16(ep), prot)
 	if err != nil {
-		return portmapResult{}, err
+		return 0, 0, err
 	}
-	return portmapResult{
-		externalPort: uint16(ep),
-		lifetime:     0,
-	}, nil
+	return ep, 0, nil
 }
 
+// newClient attempts to contact a NAT-PMP gateway; if that fails, it
+// attempts to discover a uPNP gateway.
 func newClient(kind int) (portmapClient, error) {
 	var err error
 	if (kind & NATPMP) != 0 {
@@ -195,6 +197,7 @@ func newClient(kind int) (portmapClient, error) {
 var clientMu sync.Mutex
 var client portmapClient
 
+// getClient is a memoised version of newClient.
 func getClient(kind int) (portmapClient, error) {
 	clientMu.Lock()
 	defer clientMu.Unlock()
@@ -212,12 +215,15 @@ func getClient(kind int) (portmapClient, error) {
 	return client, nil
 }
 
+// failClient resets the cache set by getClient.
 func failClient() {
 	clientMu.Lock()
 	defer clientMu.Unlock()
 	client = nil
 }
 
+// Map runs a portmapping loop for both TCP and UDP.  The kind parameter
+// indicates the portmapping protocols to attempt.
 func Map(ctx context.Context, kind int) error {
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -237,28 +243,44 @@ func domap(ctx context.Context, proto string, kind int) {
 	var client portmapClient
 	unmap := func() {
 		if client != nil {
-			res, err := client.AddPortMapping(
+			ep, _, err := client.AddPortMapping(
 				proto, config.ProtocolPort,
 				config.ExternalPort(proto == "tcp", false),
 				0)
 			if err != nil {
 				log.Printf("Portmap: %v", err)
 			} else {
-				log.Printf("Unmapped %v: %v->%v", proto,
-					config.ProtocolPort, res.externalPort)
+				log.Printf("Unmapped %v: %v->%v",
+					proto, config.ProtocolPort, ep,
+				)
 			}
 		}
 		config.SetExternalIPv4Port(config.ProtocolPort, proto == "tcp")
 		client = nil
 	}
+
 	defer unmap()
 
-	for ctx.Err() == nil {
+	sleep := func(d time.Duration) error {
+		timer := time.NewTimer(d)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+			return nil
+		}
+	}
+
+	for {
 		c, err := getClient(kind)
 		if err != nil {
 			log.Printf("Portmap: %v", err)
 			unmap()
-			time.Sleep(30 * time.Second)
+			err = sleep(30 * time.Second)
+			if err != nil {
+				return
+			}
 			continue
 		}
 		if c != client {
@@ -266,7 +288,7 @@ func domap(ctx context.Context, proto string, kind int) {
 			client = c
 		}
 
-		res, err := client.AddPortMapping(
+		ep, lifetime, err := client.AddPortMapping(
 			proto, config.ProtocolPort,
 			config.ExternalPort(proto == "tcp", false),
 			30*60,
@@ -279,24 +301,18 @@ func domap(ctx context.Context, proto string, kind int) {
 			continue
 		}
 
-		config.SetExternalIPv4Port(int(res.externalPort), proto == "tcp")
+		config.SetExternalIPv4Port(int(ep), proto == "tcp")
 
 		log.Printf("Mapped %v: %v->%v, %v",
 			proto, config.ProtocolPort,
-			res.externalPort,
-			time.Duration(res.lifetime)*time.Second)
+			ep, time.Duration(lifetime)*time.Second)
 
-		seconds := res.lifetime
-		if seconds < 30 {
-			seconds = 30
+		if lifetime < 30 {
+			lifetime = 30
 		}
-		timer := time.NewTimer(time.Duration(seconds) * time.Second *
-			2 / 3)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
+		err = sleep(time.Duration(lifetime) * time.Second * 2 / 3)
+		if err != nil {
 			return
-		case <-timer.C:
 		}
 	}
 }
