@@ -20,6 +20,7 @@ DWORDLONG total() {
 */
 import "C"
 
+// Total returns the amount of memory on the local machine in bytes.
 func Total() (int64, error) {
         v := C.total()
 	if v <= 0 {

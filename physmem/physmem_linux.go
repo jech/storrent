@@ -2,6 +2,7 @@ package physmem
 
 import "golang.org/x/sys/unix"
 
+// Total returns the amount of memory on the local machine in bytes.
 func Total() (int64, error) {
 	var info unix.Sysinfo_t
 	err := unix.Sysinfo(&info)

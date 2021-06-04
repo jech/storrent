@@ -1,9 +1,3 @@
-//+build !linux,!windows windows,!cgo
+// Package physmem computes the amount of physical memory on the machine.
 
 package physmem
-
-import "errors"
-
-func Total() (int64, error) {
-	return -1, errors.New("cannot compute physical memory on this platform")
-}
