@@ -16,8 +16,17 @@ please do not get offended if I don't listen to your feature requests.
 Installation
 ------------
 
+With go-1.16 or later:
+
     go install github.com/jech/storrent@latest
 
+With older versions:
+
+    git clone https://github.com/jech/storrent
+    cd storrent
+    GO111MODULE=on go install
+
+Then ensure that ~/go/bin is in your path.
 
 Running
 -------
