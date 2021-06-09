@@ -113,6 +113,10 @@ func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 			max = int(w.count)
 		}
 		n, er := r.Read(w.buf[len(w.buf):max])
+		if n == 0 {
+			err = er
+			break
+		}
 		w.buf = w.buf[:len(w.buf)+n]
 		peer.DownloadEstimator.Accumulate(n)
 		m, ew := w.write(w.buf)
