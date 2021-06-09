@@ -39,7 +39,7 @@ func (ws *Hoffman) Get(ctx context.Context, proxy string, hash []byte,
 	}
 	req.Header["User-Agent"] = nil
 
-	client := httpclient.Get(proxy)
+	client := httpclient.Get("", proxy)
 	if client == nil {
 		return 0, errors.New("couldn't get HTTP client")
 	}

@@ -1,6 +1,10 @@
+// Package httpclient implements caching for net/http.Client.
+
 package httpclient
 
 import (
+	"context"
+	"errors"
 	"math/rand"
 	"net"
 	"net/http"
@@ -9,27 +13,41 @@ import (
 	"time"
 )
 
+var ErrWrongNetwork = errors.New("wrong network")
+
+type key struct {
+	proxy, network string
+}
+
 type client struct {
 	client *http.Client
 	time   time.Time
 }
 
 var mu sync.Mutex
-var clients = make(map[string]client)
+var clients = make(map[key]client)
 
 var runExpiry sync.Once
 
-func Get(proxy string) *http.Client {
+// Get returns an http.Client that goes through the given proxy.  If
+// network is not empty, it restricts connections to the given protocol
+// ("tcp" or "tcp6").
+func Get(network, proxy string) *http.Client {
 	runExpiry.Do(func() {
 		go expire()
 	})
 
 	mu.Lock()
 	defer mu.Unlock()
-	cl, ok := clients[proxy]
+	cl, ok := clients[key{network: network, proxy: proxy}]
 	if ok {
 		cl.time = time.Now()
 		return cl.client
+	}
+	dialer := net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
 	}
 	transport := &http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
@@ -38,11 +56,16 @@ func Get(proxy string) *http.Client {
 			}
 			return url.Parse(proxy)
 		},
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
+		DialContext: func(ctx context.Context, n, a string) (net.Conn, error) {
+			if n == "" || n == "tcp" {
+				if network != "" && network != "tcp" {
+					n = network
+				}
+			} else if n != network {
+				return nil, ErrWrongNetwork
+			}
+			return dialer.DialContext(ctx, n, a)
+		},
 		MaxIdleConns:          30,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
@@ -55,7 +78,7 @@ func Get(proxy string) *http.Client {
 		},
 		time: time.Now(),
 	}
-	clients[proxy] = cl
+	clients[key{network: network, proxy: proxy}] = cl
 	return cl.client
 }
 

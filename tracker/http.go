@@ -7,6 +7,7 @@ import (
 	"net/http"
 	nurl "net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/zeebo/bencode"
@@ -51,16 +52,53 @@ func (tracker *HTTP) Announce(ctx context.Context, hash []byte, myid []byte,
 
 	tracker.time = time.Now()
 
-	interval, err := announceHTTP(ctx, tracker, hash, myid,
-		want, size, port4, port6, proxy, f)
+	var interval int
+	var err error
+
+	if proxy != "" {
+		port := port6
+		if port == 0 {
+			port = port4
+		}
+		interval, err = announceHTTP(
+			ctx, "", tracker, hash, myid, want, size, port, proxy, f,
+		)
+	} else {
+		var i4, i6 int
+		var e4, e6 error
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			i4, e4 = announceHTTP(
+				ctx, "tcp4", tracker, hash, myid,
+				want, size, port4, proxy, f,
+			)
+			wg.Done()
+		}()
+		go func() {
+			i6, e6 = announceHTTP(
+				ctx, "tcp6", tracker, hash, myid,
+				want, size, port6, proxy, f,
+			)
+			wg.Done()
+		}()
+		wg.Wait()
+		if e4 != nil && e6 != nil {
+			err = e4
+		}
+		interval = i4
+		if interval < i6 {
+			interval = i6
+		}
+	}
 
 	tracker.updateInterval(time.Duration(interval)*time.Second, err)
 	return err
 }
 
 // announceHTTP performs a single HTTP announce
-func announceHTTP(ctx context.Context, tracker *HTTP, hash []byte, myid []byte,
-	want int, size int64, port4, port6 int, proxy string,
+func announceHTTP(ctx context.Context, protocol string, tracker *HTTP,
+	hash []byte, myid []byte, want int, size int64, port int, proxy string,
 	f func(net.IP, int) bool) (int, error) {
 	url, err := nurl.Parse(tracker.url)
 	if err != nil {
@@ -71,10 +109,8 @@ func announceHTTP(ctx context.Context, tracker *HTTP, hash []byte, myid []byte,
 	v.Set("info_hash", string(hash))
 	v.Set("peer_id", string(myid))
 	v.Set("numwant", strconv.Itoa(want))
-	if port6 > 0 {
-		v.Set("port", strconv.Itoa(port6))
-	} else if port4 > 0 {
-		v.Set("port", strconv.Itoa(port4))
+	if port > 0 {
+		v.Set("port", strconv.Itoa(port))
 	}
 	v.Set("downloaded", strconv.FormatInt(size/2, 10))
 	v.Set("uploaded", strconv.FormatInt(2*size, 10))
@@ -90,7 +126,7 @@ func announceHTTP(ctx context.Context, tracker *HTTP, hash []byte, myid []byte,
 	req.Header.Set("Cache-Control", "max-age=0")
 	req.Header["User-Agent"] = nil
 
-	client := httpclient.Get(proxy)
+	client := httpclient.Get(protocol, proxy)
 	if client == nil {
 		return 0, errors.New("couldn't get HTTP client")
 	}

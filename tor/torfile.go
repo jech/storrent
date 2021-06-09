@@ -120,7 +120,7 @@ func GetTorrent(ctx context.Context, proxy string, url string) (*Torrent, error)
 	req.Header["User-Agent"] = nil
 	req.Close = true
 
-	client := httpclient.Get(proxy)
+	client := httpclient.Get("", proxy)
 	if client == nil {
 		return nil, errors.New("couldn't create HTTP client")
 	}
