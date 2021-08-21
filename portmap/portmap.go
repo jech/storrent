@@ -194,16 +194,19 @@ func newClient(kind int) (portmapClient, error) {
 	return nil, err
 }
 
-var clientMu sync.Mutex
-var client portmapClient
+// clientCache is a thread-safe cache for a portmapping client
+type clientCache struct {
+	mu sync.Mutex
+	client portmapClient
+}
 
-// getClient is a memoised version of newClient.
-func getClient(kind int) (portmapClient, error) {
-	clientMu.Lock()
-	defer clientMu.Unlock()
+// get fetches the client stored in the cache, or creates a new one
+func (cache *clientCache) get(kind int) (portmapClient, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
 
-	if client != nil {
-		return client, nil
+	if cache.client != nil {
+		return cache.client, nil
 	}
 
 	c, err := newClient(kind)
@@ -211,35 +214,36 @@ func getClient(kind int) (portmapClient, error) {
 		return nil, err
 	}
 
-	client = c
-	return client, nil
+	cache.client = c
+	return c, nil
 }
 
-// failClient resets the cache set by getClient.
-func failClient() {
-	clientMu.Lock()
-	defer clientMu.Unlock()
-	client = nil
+// reset resets the cache
+func (cache *clientCache) reset() {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	cache.client = nil
 }
 
 // Map runs a portmapping loop for both TCP and UDP.  The kind parameter
 // indicates the portmapping protocols to attempt.
 func Map(ctx context.Context, kind int) error {
+	cache := &clientCache{}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		domap(ctx, "tcp", kind)
+		domap(ctx, cache, "tcp", kind)
 		wg.Done()
 	}()
 	go func() {
-		domap(ctx, "udp", kind)
+		domap(ctx, cache, "udp", kind)
 		wg.Done()
 	}()
 	wg.Wait()
 	return nil
 }
 
-func domap(ctx context.Context, proto string, kind int) {
+func domap(ctx context.Context, cache *clientCache, proto string, kind int) {
 	var client portmapClient
 	unmap := func() {
 		if client != nil {
@@ -273,7 +277,7 @@ func domap(ctx context.Context, proto string, kind int) {
 	}
 
 	for {
-		c, err := getClient(kind)
+		c, err := cache.get(kind)
 		if err != nil {
 			log.Printf("Portmap: %v", err)
 			unmap()
@@ -296,7 +300,7 @@ func domap(ctx context.Context, proto string, kind int) {
 		if err != nil {
 			log.Printf("Portmap: %v", err)
 			unmap()
-			failClient()
+			cache.reset()
 			client = nil
 			continue
 		}
