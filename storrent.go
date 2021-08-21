@@ -201,7 +201,37 @@ func main() {
 
 	if pmkind != 0 {
 		go func() {
-			err := portmap.Map(ctx, pmkind)
+			err := portmap.Map(ctx, "STorrent",
+				uint16(config.ProtocolPort), pmkind,
+				func(proto string, status portmap.Status, err error) {
+					if err != nil {
+						log.Printf(
+							"Port mapping: %v", err,
+						)
+					} else if status.Lifetime > 0 {
+						log.Printf(
+							"Mapped %v %v->%v (%v)",
+							proto,
+							status.Internal,
+							status.External,
+							status.Lifetime,
+						)
+					} else {
+						log.Printf(
+							"Unmapped %v %v",
+							proto,
+							status.Internal,
+						)
+					}
+					e := status.External
+					if e == 0 {
+						e = status.Internal
+					}
+					config.SetExternalIPv4Port(
+						int(e), proto == "tcp",
+					)
+				},
+			)
 			if err != nil {
 				log.Println(err)
 			}
