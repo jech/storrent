@@ -21,13 +21,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jech/portmap"
+
 	"github.com/jech/storrent/config"
 	"github.com/jech/storrent/crypto"
 	"github.com/jech/storrent/fuse"
 	thttp "github.com/jech/storrent/http"
 	"github.com/jech/storrent/peer"
 	"github.com/jech/storrent/physmem"
-	"github.com/jech/storrent/portmap"
 	"github.com/jech/storrent/rundht"
 	"github.com/jech/storrent/tor"
 )
