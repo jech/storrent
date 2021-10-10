@@ -87,6 +87,9 @@ var messages = []mtest{
 	mtest{HaveNone{}, ""},
 	mtest{Extended0{"toto", 1234, 256,
 		net.ParseIP("1.2.3.4").To4(), net.ParseIP("2001::1"), 1024,
+		nil, false, true}, ""},
+	mtest{Extended0{"toto", 1234, 256,
+		net.ParseIP("1.2.3.4").To4(), net.ParseIP("2001::1"), 1024,
 		map[string]uint8{"ut_pex": ExtPex}, false, true}, ""},
 	mtest{ExtendedMetadata{ExtMetadata, 0, 2, 64 * 1024,
 		nil}, "\x00\x00\x00/\x14\x02" +

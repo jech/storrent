@@ -55,7 +55,7 @@ type extensionInfo struct {
 	Port         uint16           `bencode:"p,omitempty"`
 	ReqQ         uint32           `bencode:"reqq,omitempty"`
 	MetadataSize uint32           `bencode:"metadata_size,omitempty"`
-	Messages     map[string]uint8 `bencode:"m"`
+	Messages     map[string]uint8 `bencode:"m,omitempty"`
 	UploadOnly   boolOrString     `bencode:"upload_only"`
 	Encrypt      boolOrString     `bencode:"e,omitempty"`
 }

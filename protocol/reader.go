@@ -262,7 +262,9 @@ func Read(r *bufio.Reader, l *log.Logger) (Message, error) {
 				m.IPv6 = ext.IPv6
 			}
 			m.MetadataSize = ext.MetadataSize
-			m.Messages = ext.Messages
+			if len(ext.Messages) > 0 {
+				m.Messages = ext.Messages
+			}
 			m.UploadOnly = bool(ext.UploadOnly)
 			m.Encrypt = bool(ext.Encrypt)
 			debugf("<- Extended0 %v", m.Version)
@@ -384,8 +386,7 @@ func Reader(c net.Conn, init []byte, l *log.Logger, ch chan<- Message, done <-ch
 	}
 	for {
 		var m Message
-		err := c.SetReadDeadline(
-			time.Now().Add(6 * time.Minute))
+		err := c.SetReadDeadline(time.Now().Add(6 * time.Minute))
 		if err == nil {
 			m, err = Read(r, l)
 		}
