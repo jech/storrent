@@ -1,4 +1,4 @@
-//+build !linux,!windows windows,!cgo
+// +build !linux,!windows
 
 package physmem
 

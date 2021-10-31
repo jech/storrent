@@ -1,30 +1,32 @@
 package physmem
 
 import (
-	"errors"
+	"syscall"
+	"unsafe"
 )
 
-/*
-#include "windows.h"
+var kernel32 = syscall.NewLazyDLL("kernel32.dll")
+var globalMemoryStatusEx = kernel32.NewProc("GlobalMemoryStatusEx")
 
-DWORDLONG total() {
-    MEMORYSTATUSEX meminfo;
-    BOOL rc;
-    memset(&meminfo, 0, sizeof(meminfo));
-    meminfo.dwLength = sizeof(meminfo);
-    rc = GlobalMemoryStatusEx(&meminfo);
-    if(!rc)
-        return 0;
-    return meminfo.ullTotalPhys;
+type memoryStatusEx struct {
+	dwLength                uint32
+	dwMemoryLoad            uint32
+	ullTotalPhys            uint64
+	ullAvailPhys            uint64
+	ullTotalPageFile        uint64
+	ullAvailPageFile        uint64
+	ullTotalVirtual         uint64
+	ullAvailVirtual         uint64
+	ullAvailExtendedVirtual uint64
 }
-*/
-import "C"
 
 // Total returns the amount of memory on the local machine in bytes.
 func Total() (int64, error) {
-        v := C.total()
-	if v <= 0 {
-		return 0, errors.New("GlobalMemoryStatusEx failed")
+	var info memoryStatusEx
+	info.dwLength = uint32(unsafe.Sizeof(info))
+	rc, _, err := globalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&info)))
+	if rc == 0 {
+		return 0, err
 	}
-	return int64(v), nil
+	return int64(info.ullTotalPhys), nil
 }
