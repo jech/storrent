@@ -79,17 +79,6 @@ func randomInt() (*big.Int, error) {
 	return &x, nil
 }
 
-func tobytes(buf []byte, v *big.Int) {
-	b := v.Bytes()
-	if len(b) > len(buf) {
-		panic("Integer too big")
-	}
-	for i := 0; i < len(buf)-len(b); i++ {
-		buf[i] = 0
-	}
-	copy(buf[len(buf)-len(b):], b)
-}
-
 func hash(v ...[]byte) []byte {
 	h := sha1.New()
 	for _, w := range v {
@@ -165,7 +154,7 @@ func writeWithPad(conn net.Conn, v *big.Int) <-chan error {
 	lbuf[0] &= 1
 	length := uint16(lbuf[0])<<8 | uint16(lbuf[1])
 	buf := make([]byte, 768/8+int(length))
-	tobytes(buf[:768/8], v)
+	v.FillBytes(buf[:768/8])
 	crand.Read(buf[768/8:])
 	return writeAsync(conn, buf)
 }
@@ -229,7 +218,7 @@ func ClientHandshake(c net.Conn, skey []byte, ia []byte, options *Options) (conn
 	}
 
 	sb := make([]byte, 768/8)
-	tobytes(sb, &s)
+	s.FillBytes(sb)
 	enc, err := rc4.NewCipher(hash([]byte("keyA"), sb, skey))
 	if err != nil {
 		return
@@ -390,7 +379,7 @@ func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) 
 	ch := writeWithPad(conn, &yb)
 
 	sb := make([]byte, 768/8)
-	tobytes(sb, &s)
+	s.FillBytes(sb)
 
 	buf, err = synchronise(conn, buf, hash([]byte("req1"), sb),
 		4+768/8+512, 1500)
