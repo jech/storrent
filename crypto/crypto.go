@@ -317,7 +317,7 @@ func ClientHandshake(c net.Conn, skey []byte, ia []byte, options *Options) (conn
 	}
 }
 
-// ClientHandshake performs the server side of the BitTorrent protocol
+// ServerHandshake performs the server side of the BitTorrent protocol
 // encryption handshake.  It returns an encrypted connection, the skey
 // that was agreed upon (a torrent hash), and any cleartext that was
 // included within the handshake.
