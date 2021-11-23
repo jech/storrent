@@ -1,23 +1,24 @@
 package crypto
 
 import (
-	"time"
-	"sync"
+	"bytes"
 	"io"
 	"net"
+	"sync"
 	"testing"
+	"time"
 )
 
 var options1 = &Options{
 	AllowCryptoHandshake: true,
-	AllowEncryption: true,
-	ForceEncryption: true,
+	AllowEncryption:      true,
+	ForceEncryption:      true,
 }
 
 var options0 = &Options{
 	AllowCryptoHandshake: true,
-	AllowEncryption: false,
-	ForceEncryption: false,
+	AllowEncryption:      false,
+	ForceEncryption:      false,
 }
 
 func testHandshake(t *testing.T, options *Options) {
@@ -40,7 +41,7 @@ func testHandshake(t *testing.T, options *Options) {
 
 	serverData := make([]byte, 6385)
 	for i := range serverData {
-		serverData[i] = byte(42-i)
+		serverData[i] = byte(42 - i)
 	}
 
 	var wg sync.WaitGroup
@@ -62,14 +63,14 @@ func testHandshake(t *testing.T, options *Options) {
 			t.Errorf("Client Write: %v %v", n, err)
 			return
 		}
-		data := make([]byte, len(serverData) - len(buf))
+		data := make([]byte, len(serverData)-len(buf))
 		n, err = io.ReadFull(eclient, data[len(buf):])
 		if err != nil || n != len(data) {
 			t.Errorf("Client Read: %v %v", n, err)
 			return
 		}
 		data = append(buf, data...)
-		if !eq(data, serverData) {
+		if !bytes.Equal(data, serverData) {
 			t.Errorf("Client data mismatch")
 			return
 		}
@@ -84,7 +85,7 @@ func testHandshake(t *testing.T, options *Options) {
 		t.Fatalf("Read: %v", err)
 	}
 	eserver, skey, _, err := ServerHandshake(
-		server,	head, [][]byte{clientSkey, make([]byte, 20)}, options)
+		server, head, [][]byte{clientSkey, make([]byte, 20)}, options)
 	if err != nil {
 		server.Close()
 		t.Fatalf("ServerHandshake: %v", err)
@@ -92,7 +93,7 @@ func testHandshake(t *testing.T, options *Options) {
 
 	defer eserver.Close()
 
-	if len(skey) != len(clientSkey) || !eq(skey, clientSkey) {
+	if len(skey) != len(clientSkey) || !bytes.Equal(skey, clientSkey) {
 		t.Fatalf("Skey mismatch: %v /= %v", skey, clientSkey)
 	}
 
@@ -101,7 +102,7 @@ func testHandshake(t *testing.T, options *Options) {
 	if err != nil || n != len(data) {
 		t.Fatalf("Server Read: %v %v", n, err)
 	}
-	if !eq(data, clientData) {
+	if !bytes.Equal(data, clientData) {
 		t.Fatalf("Server data mismatch")
 	}
 
@@ -182,7 +183,7 @@ func BenchmarkHandshake(b *testing.B) {
 
 		eserver, _, _, err :=
 			ServerHandshake(server, []byte{}, [][]byte{skey},
-			options1)
+				options1)
 		buf := make([]byte, 1)
 		n, err := eserver.Read(buf)
 		if n != 0 || err != io.EOF {
@@ -192,7 +193,6 @@ func BenchmarkHandshake(b *testing.B) {
 		eserver.Close()
 	}
 }
-
 
 func BenchmarkClient(b *testing.B) {
 	client, server := net.Pipe()

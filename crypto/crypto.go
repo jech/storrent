@@ -94,18 +94,6 @@ func len2(v []byte) []byte {
 	return w
 }
 
-func eq(v1 []byte, v2 []byte) bool {
-	if len(v1) != len(v2) {
-		panic("eq: wrong length")
-	}
-	for i := range v1 {
-		if v1[i] != v2[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func xor(v1 []byte, v2 []byte) []byte {
 	if len(v1) != len(v2) {
 		panic("xor: wrong length")
@@ -400,7 +388,7 @@ func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) 
 	buf = buf[20:]
 	req2 := xor(req23, hash([]byte("req3"), sb))
 	for _, sk := range skeys {
-		if eq(req2, hash([]byte("req2"), sk)) {
+		if bytes.Equal(req2, hash([]byte("req2"), sk)) {
 			skey = sk
 			break
 		}
@@ -452,7 +440,7 @@ func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) 
 
 	stuff := decrypt(estuff)
 	theirvc := stuff[:len(vc)]
-	if !eq(theirvc, vc) {
+	if !bytes.Equal(theirvc, vc) {
 		err = errors.New("bad VC")
 		return
 	}
