@@ -714,10 +714,11 @@ func (peer *Peer) startStopUpload() {
 		interval < peer.uploadInterval*3/2 {
 		return
 	}
-	if peer.uploadTicker != nil {
-		peer.uploadTicker.Stop()
+	if peer.uploadTicker == nil {
+		peer.uploadTicker = time.NewTicker(interval)
+	} else {
+		peer.uploadTicker.Reset(interval)
 	}
-	peer.uploadTicker = time.NewTicker(interval)
 	peer.uploadInterval = interval
 	peer.upload.Start()
 }
