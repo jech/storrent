@@ -238,7 +238,6 @@ func main() {
 			}
 			close(portmapdone)
 		}()
-		time.Sleep(200 * time.Millisecond)
 	} else {
 		close(portmapdone)
 	}
