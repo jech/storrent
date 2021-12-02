@@ -578,18 +578,21 @@ func (t *Torrent) setRequestInterval(interval time.Duration) {
 		return
 	}
 
-	if t.requestTicker != nil {
-		t.requestTicker.Stop()
-		t.requestTicker = nil
-		t.requestInterval = 0
-		t.requestSeconds = 0
-	}
-
 	if interval == 0 {
+		if t.requestTicker != nil {
+			t.requestTicker.Stop()
+			t.requestTicker = nil
+			t.requestInterval = 0
+			t.requestSeconds = 0
+		}
 		return
 	}
 
-	t.requestTicker = time.NewTicker(interval)
+	if t.requestTicker == nil {
+		t.requestTicker = time.NewTicker(interval)
+	} else {
+		t.requestTicker.Reset(interval)
+	}
 	t.requestInterval = interval
 	t.requestSeconds = float64(interval) / float64(time.Second)
 }
