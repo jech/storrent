@@ -5,12 +5,9 @@ Storrent is a BitTorrent implementation that is optimised for streaming
 media: it allows you to watch a movie or to listen to music from a Torrent
 without downloading it entirely.
 
-Storrent works entirely in RAM: except for the DHT database, it will never
-write anything to disk.  It requires a fair amount of memory (1GB will do,
-4GB is better).
-
-Storrent was written for my own needs.  It might or might not fit yours;
-please do not get offended if I don't listen to your feature requests.
+Storrent works entirely in RAM: except for the DHT bootstrap database, it
+will never write anything to disk.  It requires a fair amount of memory
+(1GB will do, 4GB is better).
 
 
 Installation
@@ -18,21 +15,21 @@ Installation
 
     git clone https://github.com/jech/storrent
     cd storrent
-    GO111MODULE=on go install
+    go build
 
-Then ensure that ~/go/bin is in your path.
+This will yield a binary called `storrent` or `storrent.exe`.
 
 Running
 -------
 
-    storrent &
+    ./storrent &
       
 Now go to
 
     http://localhost:8088
     
-and add a magnet link or a link to a torrent file.  Wait a few minutes,
-then hit reload; you should see a link to a playlist which you should
+and add a magnet link or a link to a torrent file.  Wait a few seconds,
+then hit reload; you should see a link to a playlist which you may
 download and feed to your favourite media player.
 
 
@@ -58,7 +55,7 @@ I usually run storrent in a slightly more paranoid mode than the default:
 
 For privacy reasons, storrent doesn't use trackers or webseeds by default;
 you may enable them on a torrent-by-torrent basis in the user interface.
-You may override the default from the command line:
+Should you wish to override the default, do:
 
     storrent -use-trackers -use-webseeds
 
