@@ -21,7 +21,7 @@ const (
 
 // Equal returns true if two peers have the same socket address.
 func (p Peer) Equal(q Peer) bool {
-	return p.IP.Equal(q.IP) && q.Port == q.Port
+	return p.IP.Equal(q.IP) && p.Port == q.Port
 }
 
 // Find find a peer in a list of peers.
