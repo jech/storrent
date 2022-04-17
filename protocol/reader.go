@@ -6,7 +6,6 @@ import (
 	"errors"
 	"github.com/zeebo/bencode"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"sync"
@@ -246,7 +245,7 @@ func Read(r *bufio.Reader, l *log.Logger) (Message, error) {
 			if err != nil {
 				return nil, err
 			}
-			_, err = io.Copy(ioutil.Discard, lr)
+			_, err = io.Copy(io.Discard, lr)
 			if err != nil {
 				return nil, err
 			}
@@ -277,7 +276,7 @@ func Read(r *bufio.Reader, l *log.Logger) (Message, error) {
 			if err != nil {
 				return nil, err
 			}
-			_, err = io.Copy(ioutil.Discard, lr)
+			_, err = io.Copy(io.Discard, lr)
 			if err != nil {
 				return nil, err
 			}

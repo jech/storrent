@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	nurl "net/url"
@@ -289,7 +288,7 @@ func udpRequestReply(ctx context.Context, conn net.Conn, request []byte,
 		}
 
 		if a == 3 {
-			message, err := ioutil.ReadAll(r)
+			message, err := io.ReadAll(r)
 			if err != nil {
 				return nil, err
 			}

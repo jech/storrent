@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -155,7 +154,7 @@ func TestWriter(t *testing.T) {
 				b = b[:n]
 				p2.Close()
 			}()
-			err := Write(w, m.m, log.New(ioutil.Discard, "", 0))
+			err := Write(w, m.m, log.New(io.Discard, "", 0))
 			if err != nil {
 				t.Error(err)
 			}
