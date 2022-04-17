@@ -177,7 +177,9 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 	peer.myBitmap = bitmap
 
 	defer func() {
-		peer.Log.Printf("Close")
+		if config.Debug {
+			peer.Log.Printf("Close")
+		}
 		peer.conn.Close()
 		if peer.amUnchoking != 0 {
 			n := atomic.AddInt32(&numUnchoking, -1)
@@ -366,7 +368,9 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 			peer.time = time.Now()
 			err := handleMessage(peer, m)
 			if err != nil {
-				peer.Log.Printf("handleMessage: %v", err)
+				if err != io.EOF {
+					peer.Log.Printf("handleMessage: %v", err)
+				}
 				readTimeout(0)
 				return nil
 			}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net"
@@ -380,7 +381,7 @@ func listen(listener net.Listener) {
 		go func(conn net.Conn) {
 			err = tor.Server(conn,
 				crypto.OptionsMap[config.DefaultEncryption])
-			if err != nil {
+			if err != nil && err != io.EOF {
 				log.Printf("Server: %v", err)
 			}
 		}(conn)

@@ -1367,8 +1367,8 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 			}
 			err := DialClient(ctx, t, kp.Addr.IP, kp.Addr.Port,
 				crypto.OptionsMap[config.DefaultEncryption])
-			if err != nil {
-				t.Log.Printf("Client: %v", err)
+			if err != nil && config.Debug {
+				t.Log.Printf("DialClient: %v", err)
 			}
 		}(kp)
 		count++
