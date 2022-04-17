@@ -50,37 +50,37 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	flag.IntVar(&config.ProtocolPort, "port", 23222,
-		"TCP and UDP `port` used for BitTorrent and DHT traffic.")
+		"TCP and UDP `port` used for BitTorrent and DHT traffic")
 	flag.StringVar(&config.HTTPAddr, "http", "[::1]:8088",
-		"Web server address.")
+		"Web server `address`")
 	flag.Int64Var(&config.MemoryMark, "mem", mem/2,
-		"Target memory usage in `bytes`.")
+		"Target memory usage in `bytes`")
 	flag.StringVar(&cpuprofile, "cpuprofile", "",
-		"CPU profile `filename`.")
+		"CPU profile `filename`")
 	flag.StringVar(&memprofile, "memprofile", "",
-		"Memory profile `filename`.")
+		"Memory profile `filename`")
 	flag.StringVar(&mutexprofile, "mutexprofile", "",
-		"Mutex profile `filename`.")
+		"Mutex profile `filename`")
 	flag.StringVar(&tracefile, "trace", "",
-		"Execution trace `filename`.")
+		"Execution trace `filename`")
 	flag.StringVar(&proxyURL, "proxy", "",
 		"`URL` of a proxy to use for BitTorrent and tracker traffic.\n"+
-			"For tor, use \"socks5://127.0.0.1:9050\" and disable the DHT.")
+			"For tor, use \"socks5://127.0.0.1:9050\" and disable the DHT")
 	flag.StringVar(&mountpoint, "mountpoint", "",
-		"FUSE `mountpoint`.")
+		"FUSE `mountpoint`")
 	flag.BoolVar(&config.DefaultDhtPassive, "dht-passive", false,
-		"Don't perform DHT announces by default.")
+		"Don't perform DHT announces")
 	flag.BoolVar(&config.DefaultUseTrackers, "use-trackers", false,
-		"Use trackers (if available) by default.")
+		"Use trackers (if available)")
 	flag.BoolVar(&config.DefaultUseWebseeds, "use-webseeds", false,
-		"Use webseeds (if available) by default.")
+		"Use webseeds (if available)")
 	flag.Float64Var(&config.PrefetchRate, "prefetch-rate", 768*1024,
-		"Prefetch `rate` in bytes per second.")
+		"Prefetch `rate` in bytes per second")
 	flag.IntVar(&config.DefaultEncryption, "encryption", 2,
-		"Encryption `level` (0 = never, 2 = default, 5 = always)")
-	flag.StringVar(&doPortmap, "portmap", "auto", "NAT port mappping (natpmp, upnp, auto, or off)")
+		"Encryption `level` (0 = never, 2 = allow, 5 = force)")
+	flag.StringVar(&doPortmap, "portmap", "auto", "NAT port mappping `protocol` (natpmp, upnp, auto, or off)")
 	flag.BoolVar(&config.Debug, "debug", false,
-		"Log all BitTorrent messages.")
+		"Log all BitTorrent messages")
 
 	flag.Parse()
 

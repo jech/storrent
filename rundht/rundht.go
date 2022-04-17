@@ -37,9 +37,9 @@ func init() {
 	}
 
 	flag.BoolVar(&config.DefaultUseDht, "use-dht", true,
-		"Use the DHT by default.")
+		"Use the DHT")
 	flag.StringVar(&config.DHTBootstrap, "dht", dhtFile,
-		"DHT bootstrap `file`.")
+		"DHT bootstrap `filename`")
 }
 
 // BDHT represents the contents of the dht.dat file.
