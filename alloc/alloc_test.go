@@ -3,6 +3,7 @@ package alloc
 import (
 	"fmt"
 	"testing"
+	"errors"
 )
 
 const totalSize = 256 * 1024 * 1024
@@ -13,6 +14,9 @@ func doalloc(size int, a [][]byte) error {
 		if err != nil {
 			return err
 		}
+		for k := range p {
+			p[k] = byte(j+k)
+		}
 		a[j] = p
 	}
 	return nil
@@ -20,6 +24,11 @@ func doalloc(size int, a [][]byte) error {
 
 func dofree(a [][]byte) error {
 	for j := 0; j < len(a); j++ {
+		for k := range a[j] {
+			if a[j][k] != byte(j+k) {
+				return errors.New("memory corruption")
+			}
+		}
 		err := Free(a[j])
 		if err != nil {
 			return err
