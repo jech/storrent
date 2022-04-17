@@ -3,11 +3,10 @@ package tor
 import (
 	"errors"
 	"io"
+	"net"
 
 	"github.com/jech/storrent/peer"
 )
-
-var errClosedWriter = errors.New("closed writer")
 
 // A writer writes data to a torrent.  It is limited to writing within
 // a single piece.  It buffers internally any data that is not
@@ -53,7 +52,7 @@ var ErrShortWrite = errors.New("short write")
 // marked as no longer being in-flight.
 func (w *writer) Write(p []byte) (int, error) {
 	if w.t == nil {
-		return 0, errClosedWriter
+		return 0, net.ErrClosed
 	}
 	max := int(w.count) - len(w.buf)
 	if max < 0 {
@@ -93,7 +92,7 @@ func (w *writer) Write(p []byte) (int, error) {
 // ReadFrom copies data from a reader into a torrent.
 func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 	if w.t == nil {
-		return 0, errClosedWriter
+		return 0, net.ErrClosed
 	}
 	if w.count < uint32(len(w.buf)) {
 		return 0, io.EOF
@@ -142,7 +141,7 @@ func (w *writer) ReadFrom(r io.Reader) (int64, error) {
 // flight.
 func (w *writer) Close() error {
 	if w.t == nil {
-		return errClosedWriter
+		return net.ErrClosed
 	}
 	if w.count > 0 {
 		w.writeEvent(peer.TorDrop{w.index, w.offset, w.count})

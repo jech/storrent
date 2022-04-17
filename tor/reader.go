@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"runtime"
 
 	"github.com/jech/storrent/config"
 )
-
-var errClosedReader = errors.New("closed reader")
 
 // requested indicates a piece requested by a reader.
 type requested struct {
@@ -52,7 +51,7 @@ func (r *Reader) SetContext(ctx context.Context) {
 // Seek sets the position of a Reader.  It doesn't trigger prefetch.
 func (r *Reader) Seek(o int64, whence int) (n int64, err error) {
 	if r.torrent == nil {
-		return r.position, errClosedReader
+		return r.position, net.ErrClosed
 	}
 	var pos int64
 	switch whence {
@@ -161,7 +160,7 @@ func (r *Reader) request(pos int64, limit int64) (<-chan struct{}, error) {
 func (r *Reader) Read(a []byte) (n int, err error) {
 	t := r.torrent
 	if t == nil {
-		err = errClosedReader
+		err = net.ErrClosed
 		return
 	}
 
