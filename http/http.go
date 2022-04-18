@@ -777,6 +777,11 @@ func torfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("content-type", "application/x-bittorrent")
+	if t.CreationDate > 0 {
+		cdate := time.Unix(t.CreationDate, 0)
+		w.Header().Set("last-modified",
+			cdate.UTC().Format(http.TimeFormat))
+	}
 
 	if r.Method == "HEAD" {
 		return
@@ -829,7 +834,11 @@ func playlist(w http.ResponseWriter, r *http.Request, hash hash.Hash, dir path.P
 	}
 
 	w.Header().Set("content-type", "application/vnd.apple.mpegurl")
-
+	if t.CreationDate > 0 {
+		cdate := time.Unix(t.CreationDate, 0)
+		w.Header().Set("last-modified",
+			cdate.UTC().Format(http.TimeFormat))
+	}
 	if r.Method == "HEAD" {
 		return
 	}
@@ -877,12 +886,14 @@ func file(w http.ResponseWriter, r *http.Request, hash hash.Hash, path path.Path
 			return
 		}
 	}
-
+	var ctime time.Time
+	if t.CreationDate > 0 {
+		ctime = time.Unix(t.CreationDate, 0)
+	}
 	w.Header().Set("etag", etag)
-
 	reader := t.NewReader(r.Context(), offset, length)
 	defer reader.Close()
-	http.ServeContent(w, r, path.String(), time.Time{}, reader)
+	http.ServeContent(w, r, path.String(), ctime, reader)
 }
 
 func fileParms(t *tor.Torrent, hash hash.Hash, pth path.Path) (offset int64, length int64, etag string, err error) {
