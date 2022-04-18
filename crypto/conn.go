@@ -17,6 +17,7 @@ type Conn struct {
 
 	writemu sync.Mutex
 	enc     *rc4.Cipher
+	err     error
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
@@ -42,6 +43,10 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 		pool.Put(buf)
 	}()
 
+	if c.err != nil {
+		return 0, c.err
+	}
+
 	for n < len(b) {
 		m := len(b) - n
 		if m > len(buf) {
@@ -55,6 +60,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 			err = io.ErrShortWrite
 		}
 		if err != nil {
+			c.err = err
 			return
 		}
 	}
