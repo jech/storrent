@@ -343,7 +343,6 @@ func main() {
 		log.Printf("Listening on http://%v", config.HTTPAddr)
 		err := http.ListenAndServe(config.HTTPAddr, nil)
 		log.Printf("ListenAndServe: %v", err)
-		return
 	}()
 
 	go func() {

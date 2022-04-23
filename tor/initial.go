@@ -115,7 +115,7 @@ again:
 		}
 		d, ok := dialer.(proxy.ContextDialer)
 		if !ok {
-			return errors.New("Dialer is not ContextDialer")
+			return errors.New("dialer is not ContextDialer")
 		}
 		conn, err = d.DialContext(ctx, "tcp", s)
 	}

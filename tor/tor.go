@@ -1305,8 +1305,6 @@ func pickIdlePieces(t *Torrent, count int) {
 			}
 		}
 	}
-
-	return
 }
 
 // maybeConnect attempts to connect a new peer.  Or not.

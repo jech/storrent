@@ -521,7 +521,7 @@ func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) 
 		conn = &Conn{conn: conn, enc: enc, dec: dec}
 		return
 	default:
-		err = errors.New("Unexpected value for cryptoSelect")
+		err = errors.New("unexpected value for cryptoSelect")
 		return
 	}
 }

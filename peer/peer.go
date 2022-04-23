@@ -1101,9 +1101,9 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 	case protocol.ExtendedUploadOnly:
 		peer.uploadOnly = m.Value
 	case protocol.ExtendedUnknown:
-		return errors.New("Unknown extended message")
+		return errors.New("unknown extended message")
 	case protocol.Unknown:
-		return errors.New("Unknown message")
+		return errors.New("unknown message")
 	default:
 		peer.Log.Printf("%#v", m)
 		panic("Unknown message")
