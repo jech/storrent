@@ -36,11 +36,12 @@ var pool sync.Pool = sync.Pool{
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
-	buf := pool.Get().([]byte)
+	ibuf := pool.Get()
+	buf := ibuf.([]byte)
 	c.writemu.Lock()
 	defer func() {
 		c.writemu.Unlock()
-		pool.Put(buf)
+		pool.Put(ibuf)
 	}()
 
 	if c.err != nil {
