@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-const hz float64 = 1.0 / float64(time.Second)
-
 // Estimator is a rate estimator using exponential decay.  It is not
 // thread-safe.
 type Estimator struct {

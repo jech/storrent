@@ -56,7 +56,7 @@ var OptionsMap = map[int]*Options{
 	},
 }
 
-var p, g, zero, one, p1, two big.Int
+var p, g, zero, one, p1 big.Int
 var vc []byte
 
 func init() {

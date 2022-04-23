@@ -123,13 +123,3 @@ func (ws *base) Count() int {
 	ws.mu.Unlock()
 	return v
 }
-
-var bufferPool sync.Pool = sync.Pool {
-	New: func() interface{} {
-		return make([]byte, 16 * 1024)
-	},
-}
-
-func putbuf(buf []byte) {
-	bufferPool.Put(buf)
-}

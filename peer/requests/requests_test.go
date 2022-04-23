@@ -7,15 +7,6 @@ import (
 	"github.com/jech/storrent/bitmap"
 )
 
-func in(x uint32, a []uint32) bool {
-	for _, v := range a {
-		if v == x {
-			return true
-		}
-	}
-	return false
-}
-
 func rsequal(rs Requests, a []uint32) bool {
 	var b bitmap.Bitmap
 
