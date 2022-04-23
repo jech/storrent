@@ -346,11 +346,7 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		}
 		close(c.Ch)
 	case peer.TorGetPeers:
-		peers := make([]*peer.Peer, 0, len(t.peers))
-		for _, p := range t.peers {
-			peers = append(peers, p)
-		}
-		c.Ch <- peers
+		c.Ch <- append([]*peer.Peer(nil), t.peers...)
 		close(c.Ch)
 	case peer.TorGetKnown:
 		var p *known.Peer
