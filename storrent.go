@@ -339,10 +339,18 @@ func main() {
 	go listen(listener)
 
 	http.Handle("/", thttp.NewHandler(ctx))
+	log.Printf("Listening on http://%v", config.HTTPAddr)
+	httpListener, err := net.Listen("tcp", config.HTTPAddr)
+	if err != nil {
+		log.Printf("Listen (HTTP): %v", err)
+		return
+	}
+	defer httpListener.Close()
+
 	go func() {
-		log.Printf("Listening on http://%v", config.HTTPAddr)
-		err := http.ListenAndServe(config.HTTPAddr, nil)
-		log.Printf("ListenAndServe: %v", err)
+		server := &http.Server{Addr: config.HTTPAddr}
+		err := server.Serve(httpListener)
+		log.Printf("Serve HTTP: %v", err)
 	}()
 
 	go func() {
