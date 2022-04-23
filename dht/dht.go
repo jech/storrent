@@ -308,7 +308,7 @@ func DHT(ctx context.Context, myid []byte, port uint16) (<-chan Event, error) {
 	return globalEvents, nil
 }
 
-var eTooBig = errors.New("packet too big")
+var errPacketTooBig = errors.New("packet too big")
 
 func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 	buf := make([]byte, 4096)
@@ -402,7 +402,7 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 			rc, err = C.periodic(nil, 0, nil, 0, -1, &tosleep)
 			mu.Unlock()
 		} else if n > 4095 {
-			rc, err = -1, eTooBig
+			rc, err = -1, errPacketTooBig
 		} else {
 			buf[n] = 0
 			ip := from.IP
