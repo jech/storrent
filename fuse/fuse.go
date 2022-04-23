@@ -1,3 +1,4 @@
+//go:build unix || linux
 // +build unix linux
 
 package fuse
@@ -29,18 +30,12 @@ func Serve(mountpoint string) error {
 	if err != nil {
 		return err
 	}
-	<-conn.Ready
-	if conn.MountError != nil {
-		conn.Close()
-		return conn.MountError
-	}
-
 	go func(conn *fuse.Conn) {
 		defer conn.Close()
 		fs.Serve(conn, filesystem(0))
 	}(conn)
 
-	return conn.MountError
+	return nil
 }
 
 func Close(mountpoint string) error {
