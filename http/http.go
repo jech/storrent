@@ -80,7 +80,7 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		http.Redirect(w, r, pth+"/", 301)
+		http.Redirect(w, r, pth+"/", http.StatusMovedPermanently)
 		return
 	}
 
@@ -150,7 +150,8 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	} else if q == "peers" {
 		if r.Method != "HEAD" && r.Method != "GET" {
-			http.Error(w, "Method not allowed", 405)
+			http.Error(w, "Method not allowed",
+				http.StatusMethodNotAllowed)
 			return
 		}
 		hash := hash.Parse(r.Form.Get("hash"))
@@ -182,7 +183,7 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 				http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/", 303)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	} else if q == "delete" {
 		h := hash.Parse(r.FormValue("hash"))
@@ -205,7 +206,7 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		http.Redirect(w, r, "/", 303)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	} else if q == "set" {
 		upload := r.Form.Get("upload")
@@ -226,7 +227,7 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 			}
 			config.SetIdleRate(v)
 		}
-		http.Redirect(w, r, "/", 303)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	} else if q == "set-torrent" {
 		h := hash.Parse(r.FormValue("hash"))
@@ -251,7 +252,7 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 				http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/", 303)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	} else {
 		http.Error(w, "Bad request", http.StatusBadRequest)
@@ -871,7 +872,8 @@ func file(w http.ResponseWriter, r *http.Request, hash hash.Hash, path path.Path
 	}
 
 	if !t.InfoComplete() {
-		http.Error(w, "torrent metadata incomplete", 504)
+		http.Error(w, "torrent metadata incomplete",
+			http.StatusGatewayTimeout)
 		return
 	}
 
