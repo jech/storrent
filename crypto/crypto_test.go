@@ -79,7 +79,7 @@ func testHandshake(t *testing.T, options *Options) {
 	server.SetDeadline(time.Now().Add(5 * time.Second))
 
 	head := make([]byte, 7)
-	n, err := server.Read(head)
+	_, err := io.ReadFull(server, head)
 	if err != nil {
 		server.Close()
 		t.Fatalf("Read: %v", err)
@@ -98,17 +98,17 @@ func testHandshake(t *testing.T, options *Options) {
 	}
 
 	data := make([]byte, len(clientData))
-	n, err = io.ReadFull(eserver, data)
-	if err != nil || n != len(data) {
-		t.Fatalf("Server Read: %v %v", n, err)
+	_, err = io.ReadFull(eserver, data)
+	if err != nil {
+		t.Fatalf("Server Read: %v", err)
 	}
 	if !bytes.Equal(data, clientData) {
 		t.Fatalf("Server data mismatch")
 	}
 
-	n, err = eserver.Write(serverData)
-	if err != nil || n != len(serverData) {
-		t.Fatalf("Server Write: %v %v", n, err)
+	_, err = eserver.Write(serverData)
+	if err != nil {
+		t.Fatalf("Server Write: %v", err)
 	}
 	err = eserver.Close()
 	if err != nil {
@@ -184,6 +184,9 @@ func BenchmarkHandshake(b *testing.B) {
 		eserver, _, _, err :=
 			ServerHandshake(server, []byte{}, [][]byte{skey},
 				options1)
+		if err != nil {
+			b.Fatalf("ServerHandshake: %v", err)
+		}
 		buf := make([]byte, 1)
 		n, err := eserver.Read(buf)
 		if n != 0 || err != io.EOF {
