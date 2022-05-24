@@ -18,7 +18,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
-	"runtime/trace"
 	"syscall"
 	"time"
 
@@ -36,7 +35,7 @@ import (
 
 func main() {
 	var proxyURL, mountpoint string
-	var cpuprofile, memprofile, mutexprofile, tracefile string
+	var cpuprofile, memprofile, mutexprofile string
 	var doPortmap string
 
 	mem, err := physmem.Total()
@@ -61,8 +60,6 @@ func main() {
 		"Memory profile `filename`")
 	flag.StringVar(&mutexprofile, "mutexprofile", "",
 		"Mutex profile `filename`")
-	flag.StringVar(&tracefile, "trace", "",
-		"Execution trace `filename`")
 	flag.StringVar(&proxyURL, "proxy", "",
 		"`URL` of a proxy to use for BitTorrent and tracker traffic.\n"+
 			"For tor, use \"socks5://127.0.0.1:9050\" and disable the DHT")
@@ -132,21 +129,6 @@ func main() {
 			pprof.Lookup("mutex").WriteTo(f, 0)
 			f.Close()
 		}()
-	}
-
-	if tracefile != "" {
-		f, err := os.Create(tracefile)
-		if err != nil {
-			log.Printf("Create(tracefile): %v", err)
-			return
-		}
-		defer f.Close()
-		err = trace.Start(f)
-		if err != nil {
-			log.Printf("trace.Start: %v", err)
-			return
-		}
-		defer trace.Stop()
 	}
 
 	config.SetExternalIPv4Port(config.ProtocolPort, true)
