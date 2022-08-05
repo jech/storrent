@@ -485,7 +485,6 @@ func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) 
 
 	if len(buf) > 0 {
 		err = errors.New("extra data after handshake")
-		println()
 		return
 	}
 
