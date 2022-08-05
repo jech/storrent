@@ -210,7 +210,7 @@ func announceUDP(ctx context.Context, prot string,
 	case "udp4":
 		len = 4
 	case "udp6":
-		len = 6
+		len = 16
 	default:
 		panic("Eek")
 	}
