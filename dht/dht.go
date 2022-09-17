@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 // Package dht provides Go bindings for libdht, a library implementing the
@@ -502,15 +503,8 @@ func GetNodes() ([]net.TCPAddr, error) {
 		C.free(unsafe.Pointer(a6ptr))
 	}()
 
-	if aCount*6 > 4096 {
-		aCount = 4096 / 6
-	}
-	a := (*[4096]byte)(unsafe.Pointer(aptr))[:aCount*6]
-
-	if a6Count*18 > 4096 {
-		a6Count = 4096 / 18
-	}
-	a6 := (*[4096]byte)(unsafe.Pointer(a6ptr))[:a6Count*18]
+	a := unsafe.Slice((*byte)(aptr), aCount*6)
+	a6 := unsafe.Slice((*byte)(a6ptr), a6Count*18)
 
 	var addrs []net.TCPAddr
 	for i := 0; i < int(aCount); i++ {

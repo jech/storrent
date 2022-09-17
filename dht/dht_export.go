@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 package dht
@@ -28,29 +29,27 @@ func dht_callback(
 	hash := C.GoBytes(unsafe.Pointer(infoHash), 20)
 	switch event {
 	case 1: // DHT_EVENT_VALUES
-		data := (*[4096]byte)(data)
-		dataLen := int(dataLen)
-		if globalEvents == nil || dataLen > 4096 || dataLen%6 != 0 {
+		if globalEvents == nil || dataLen%6 != 0 {
 			return
 		}
-		for i := 0; i < dataLen/6; i++ {
+		data := unsafe.Slice((*byte)(data), dataLen)
+		for i := C.size_t(0); i < dataLen/6; i++ {
 			ip := make([]byte, 4)
 			copy(ip, data[6*i:6*i+4])
-			port := uint16((*data)[6*i+4])*256 +
-				uint16((*data)[6*i+5])
+			port := uint16(data[6*i+4])*256 +
+				uint16(data[6*i+5])
 			globalEvents <- ValueEvent{hash, ip, port}
 		}
 	case 2: // DHT_EVENT_VALUES6
-		data := (*[4096]byte)(data)
-		dataLen := int(dataLen)
-		if globalEvents == nil || dataLen > 4096 || dataLen%18 != 0 {
+		if globalEvents == nil || dataLen%18 != 0 {
 			return
 		}
-		for i := 0; i < dataLen/18; i++ {
+		data := unsafe.Slice((*byte)(data), dataLen)
+		for i := C.size_t(0); i < dataLen/18; i++ {
 			ip := make([]byte, 16)
 			copy(ip, data[18*i:18*i+16])
-			port := uint16((*data)[18*i+16])*256 +
-				uint16((*data)[18*i+17])
+			port := uint16(data[18*i+16])*256 +
+				uint16(data[18*i+17])
 			globalEvents <- ValueEvent{hash, ip, port}
 		}
 	}
@@ -63,22 +62,22 @@ func dht_hash(hash_return unsafe.Pointer, hash_size C.int,
 	v3 unsafe.Pointer, len3 C.int) {
 	h := sha1.New()
 	if len1 > 0 {
-		h.Write((*[4096]byte)(v1)[:len1])
+		h.Write(unsafe.Slice((*byte)(v1), len1))
 	}
 	if len2 > 0 {
-		h.Write((*[4096]byte)(v2)[:len2])
+		h.Write(unsafe.Slice((*byte)(v2), len2))
 	}
 	if len3 > 0 {
-		h.Write((*[4096]byte)(v3)[:len3])
+		h.Write(unsafe.Slice((*byte)(v3), len3))
 	}
 	sum := h.Sum(nil)
-	r := (*[4096]byte)(hash_return)
-	copy(r[0:hash_size], sum[0:hash_size])
+	r := unsafe.Slice((*byte)(hash_return), hash_size)
+	copy(r, sum[0:hash_size])
 }
 
 //export dht_random_bytes
 func dht_random_bytes(buf unsafe.Pointer, size C.size_t) C.int {
-	n, _ := crand.Read((*[4096]byte)(buf)[:size])
+	n, _ := crand.Read(unsafe.Slice((*byte)(buf), size))
 	return C.int(n)
 }
 
