@@ -188,7 +188,6 @@ func ReadTorrent(proxy string, r io.Reader) (*Torrent, error) {
 
 	err = t.MetadataComplete()
 	if err != nil {
-		t.Kill(context.Background())
 		return nil, err
 	}
 
