@@ -15,7 +15,7 @@ Installation
 
     git clone https://github.com/jech/storrent
     cd storrent
-    go build
+    CGO_ENABLED=1 go build
 
 This will yield a binary called `storrent` or `storrent.exe`.
 
