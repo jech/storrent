@@ -1,5 +1,5 @@
-//go:build unix || linux
-// +build unix linux
+//go:build linux
+// +build linux
 
 package fuse
 

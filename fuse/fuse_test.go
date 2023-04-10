@@ -1,4 +1,5 @@
-// +build unix linux
+//go:build linux
+// +build linux
 
 package fuse
 
@@ -15,4 +16,3 @@ func TestHashable(t *testing.T) {
 	table[directory{}] = 57
 	table[file{}] = 12
 }
-
