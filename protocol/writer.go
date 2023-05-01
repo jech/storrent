@@ -2,66 +2,26 @@ package protocol
 
 import (
 	"bufio"
-	"github.com/zeebo/bencode"
+	"encoding/binary"
 	"log"
 	"net"
 	"time"
 
+	"github.com/zeebo/bencode"
+
 	"github.com/jech/storrent/pex"
 )
 
-func formatUint32(b []byte, v uint32) []byte {
-	b[0] = byte(v >> 24)
-	b[1] = byte(v >> 16)
-	b[2] = byte(v >> 8)
-	b[3] = byte(v)
-	return b
-}
-
-func writeUint32(w *bufio.Writer, v uint32) error {
-	err := w.WriteByte(byte(v >> 24))
-	if err != nil {
-		return err
-	}
-	err = w.WriteByte(byte(v >> 16))
-	if err != nil {
-		return err
-	}
-	err = w.WriteByte(byte(v >> 8))
-	if err != nil {
-		return err
-	}
-	return w.WriteByte(byte(v))
-}
-
-func writeUint16(w *bufio.Writer, v uint16) error {
-	err := w.WriteByte(byte(v >> 8))
-	if err != nil {
-		return err
-	}
-	return w.WriteByte(byte(v))
-}
-
-func startMessage(w *bufio.Writer, len uint32, tpe byte) error {
-	err := writeUint32(w, uint32(len))
-	if err != nil {
-		return err
-	}
-	err = w.WriteByte(tpe)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func sendMessage(w *bufio.Writer, tpe byte, data1, data2, data3 []byte) error {
-	err := startMessage(w,
-		uint32(len(data1) + len(data2) + len(data3) + 1),
-		tpe)
+	buf := w.AvailableBuffer()
+	buf = binary.BigEndian.AppendUint32(
+		buf, uint32(len(data1)+len(data2)+len(data3)+1),
+	)
+	buf = append(buf, tpe)
+	_, err := w.Write(buf)
 	if err != nil {
 		return err
 	}
-
 	if data1 != nil {
 		_, err = w.Write(data1)
 		if err != nil {
@@ -84,39 +44,40 @@ func sendMessage(w *bufio.Writer, tpe byte, data1, data2, data3 []byte) error {
 }
 
 func sendMessage0(w *bufio.Writer, tpe byte) error {
-	return startMessage(w, 1, tpe)
+	buf := w.AvailableBuffer()
+	buf = binary.BigEndian.AppendUint32(buf, 1)
+	buf = append(buf, tpe)
+	_, err := w.Write(buf)
+	return err
 }
 
 func sendMessageShort(w *bufio.Writer, tpe byte, v uint16) error {
-	err := startMessage(w, 3, tpe)
-	if err != nil {
-		return err
-	}
-	return writeUint16(w, v)
+	buf := w.AvailableBuffer()
+	buf = binary.BigEndian.AppendUint32(buf, 3)
+	buf = append(buf, tpe)
+	buf = binary.BigEndian.AppendUint16(buf, v)
+	_, err := w.Write(buf)
+	return err
 }
 
 func sendMessage1(w *bufio.Writer, tpe byte, v uint32) error {
-	err := startMessage(w, 5, tpe)
-	if err != nil {
-		return err
-	}
-	return writeUint32(w, v)
+	buf := w.AvailableBuffer()
+	buf = binary.BigEndian.AppendUint32(buf, 5)
+	buf = append(buf, tpe)
+	buf = binary.BigEndian.AppendUint32(buf, v)
+	_, err := w.Write(buf)
+	return err
 }
 
 func sendMessage3(w *bufio.Writer, tpe byte, v1, v2, v3 uint32) error {
-	err := startMessage(w, 13, tpe)
-	if err != nil {
-		return err
-	}
-	err = writeUint32(w, v1)
-	if err != nil {
-		return err
-	}
-	err = writeUint32(w, v2)
-	if err != nil {
-		return err
-	}
-	return writeUint32(w, v3)
+	buf := w.AvailableBuffer()
+	buf = binary.BigEndian.AppendUint32(buf, 13)
+	buf = append(buf, tpe)
+	buf = binary.BigEndian.AppendUint32(buf, v1)
+	buf = binary.BigEndian.AppendUint32(buf, v2)
+	buf = binary.BigEndian.AppendUint32(buf, v3)
+	_, err := w.Write(buf)
+	return err
 }
 
 func sendExtended(w *bufio.Writer, subtype byte, data1, data2 []byte) error {
@@ -159,10 +120,16 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		return sendMessage3(w, 6, m.Index, m.Begin, m.Length)
 	case Piece:
 		debugf("-> Piece %v %v %v", m.Index, m.Begin, len(m.Data))
-		b := make([]byte, 8)
-		formatUint32(b, m.Index)
-		formatUint32(b[4:], m.Begin)
-		err := sendMessage(w, 7, b, m.Data, nil)
+		buf := w.AvailableBuffer()
+		buf = binary.BigEndian.AppendUint32(buf,
+			uint32(1+8+len(m.Data)))
+		buf = append(buf, 7)
+		buf = binary.BigEndian.AppendUint32(buf, m.Index)
+		buf = binary.BigEndian.AppendUint32(buf, m.Begin)
+		_, err := w.Write(buf)
+		if err == nil {
+			_, err = w.Write(m.Data)
+		}
 		PutBuffer(m.Data)
 		m.Data = nil
 		return err
@@ -231,11 +198,11 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		a4, f4, a6, f6 := pex.FormatCompact(m.Added)
 		d4, _, d6, _ := pex.FormatCompact(m.Dropped)
 		info := pexInfo{
-			Added: a4,
-			AddedF: f4,
-			Added6: a6,
-			Added6F: f6,
-			Dropped: d4,
+			Added:    a4,
+			AddedF:   f4,
+			Added6:   a6,
+			Added6F:  f6,
+			Dropped:  d4,
 			Dropped6: d6,
 		}
 		b, err := bencode.EncodeBytes(info)
@@ -245,7 +212,8 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		return sendExtended(w, m.Subtype, b, nil)
 	case ExtendedDontHave:
 		debugf("-> ExtendedDontHave %v", m.Index)
-		b := formatUint32(make([]byte, 4), m.Index)
+		b := make([]byte, 4)
+		binary.BigEndian.PutUint32(b, m.Index)
 		if m.Subtype == 0 {
 			panic("ExtendedDontHave subtype is 0")
 		}
