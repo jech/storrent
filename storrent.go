@@ -73,8 +73,10 @@ func main() {
 		"Use webseeds (if available)")
 	flag.Float64Var(&config.PrefetchRate, "prefetch-rate", 768*1024,
 		"Prefetch `rate` in bytes per second")
-	flag.IntVar(&config.DefaultEncryption, "encryption", 2,
-		"Encryption `level` (0 = never, 2 = allow, 5 = force)")
+	flag.BoolVar(&config.PreferEncryption, "prefer-encryption", true,
+		"Prefer encrytion")
+	flag.BoolVar(&config.ForceEncryption, "force-encryption", false,
+		"Force encryption")
 	flag.StringVar(&doPortmap, "portmap", "auto", "NAT port mappping `protocol` (natpmp, upnp, auto, or off)")
 	flag.BoolVar(&config.Debug, "debug", false,
 		"Log all BitTorrent messages")
@@ -84,12 +86,6 @@ func main() {
 	err = config.SetDefaultProxy(proxyURL)
 	if err != nil {
 		log.Printf("SetDefaultProxy: %v", err)
-		return
-	}
-
-	if config.DefaultEncryption < 0 || config.DefaultEncryption > 5 {
-		log.Printf("Wrong value %v for -encryption",
-			config.DefaultEncryption)
 		return
 	}
 
@@ -368,8 +364,10 @@ func listen(listener net.Listener) {
 			continue
 		}
 		go func(conn net.Conn) {
-			err = tor.Server(conn,
-				crypto.OptionsMap[config.DefaultEncryption])
+			err = tor.Server(conn, crypto.DefaultOptions(
+				config.PreferEncryption,
+				config.ForceEncryption,
+			))
 			if err != nil && err != io.EOF {
 				log.Printf("Server: %v", err)
 			}

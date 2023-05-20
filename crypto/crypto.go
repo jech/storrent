@@ -12,6 +12,7 @@ import (
 	"net"
 )
 
+// Type Options defines a policy for encrypting torrents
 type Options struct {
 	AllowCryptoHandshake  bool
 	PreferCryptoHandshake bool
@@ -21,39 +22,23 @@ type Options struct {
 	ForceEncryption       bool
 }
 
-// OptionsMap maps an integer command-line argument to a set of Options.
-var OptionsMap = map[int]*Options{
-	0: &Options{},
-	1: &Options{
+// DefaultOptions returns a policy for encrypting torrents.
+func DefaultOptions(prefer, force bool) *Options {
+	o := &Options{
 		AllowCryptoHandshake: true,
 		AllowEncryption:      true,
-	},
-	2: &Options{
-		AllowCryptoHandshake:  true,
-		PreferCryptoHandshake: true,
-		AllowEncryption:       true,
-	},
-	3: &Options{
-		AllowCryptoHandshake:  true,
-		PreferCryptoHandshake: true,
-		ForceCryptoHandshake:  true,
-		AllowEncryption:       true,
-	},
-	4: &Options{
-		AllowCryptoHandshake:  true,
-		PreferCryptoHandshake: true,
-		ForceCryptoHandshake:  true,
-		AllowEncryption:       true,
-		PreferEncryption:      true,
-	},
-	5: &Options{
-		AllowCryptoHandshake:  true,
-		PreferCryptoHandshake: true,
-		ForceCryptoHandshake:  true,
-		AllowEncryption:       true,
-		PreferEncryption:      true,
-		ForceEncryption:       true,
-	},
+	}
+
+	if prefer || force {
+		o.PreferCryptoHandshake = true
+		o.PreferEncryption = true
+	}
+
+	if force {
+		o.ForceCryptoHandshake = true
+		o.ForceEncryption = true
+	}
+	return o
 }
 
 var p, g, zero, one, p1 big.Int

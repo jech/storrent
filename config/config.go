@@ -75,7 +75,7 @@ func SetUploadRate(rate float64) {
 	var r uint32
 	if rate < 0 {
 		r = 0
-	} else 	if rate > float64(^uint32(0)) {
+	} else if rate > float64(^uint32(0)) {
 		r = ^uint32(0)
 	} else {
 		r = uint32(rate + 0.5)
@@ -118,8 +118,8 @@ func DefaultProxy() string {
 // specify the options of newly created torrents.
 var DefaultUseDht, DefaultDhtPassive, DefaultUseTrackers, DefaultUseWebseeds bool
 
-// DefaultEncryption specifies the encryption policy for newly created
-// torrents.  It is an index into crypto.OptionsMap.
-var DefaultEncryption int
+// PreferEncryption and ForceEncryption specify the encryption policy for
+// newly created torrents.
+var PreferEncryption, ForceEncryption bool
 
 var Debug bool

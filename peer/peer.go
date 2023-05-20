@@ -258,7 +258,10 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 				"lt_donthave": protocol.ExtDontHave,
 				"upload_only": protocol.ExtUploadOnly,
 			},
-			Encrypt: crypto.OptionsMap[config.DefaultEncryption].PreferCryptoHandshake,
+			Encrypt: crypto.DefaultOptions(
+				config.PreferEncryption,
+				config.ForceEncryption,
+			).PreferCryptoHandshake,
 		})
 		if err != nil {
 			return err
@@ -1234,7 +1237,7 @@ func unchoke(peer *Peer, unchoke bool) error {
 			atomic.AddInt32(&numUnchoking, 1)
 			peer.unchokeTime = time.Now()
 		}
-		return nil	// not an error
+		return nil // not an error
 	} else {
 		err := write(peer, protocol.Choke{})
 		if err == nil {

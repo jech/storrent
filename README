@@ -51,7 +51,7 @@ the `-portmap` flag:
 
 I usually run storrent in a slightly more paranoid mode than the default:
 
-    storrent -encryption 5 -dht-passive
+    storrent -force-encryption -dht-passive
 
 For privacy reasons, storrent doesn't use trackers or webseeds by default;
 you may enable them on a torrent-by-torrent basis in the user interface.
