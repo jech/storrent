@@ -6,6 +6,7 @@ package dht
 import (
 	crand "crypto/rand"
 	"crypto/sha1"
+	"encoding/binary"
 	"errors"
 	"net"
 	"os"
@@ -36,8 +37,7 @@ func dht_callback(
 		for i := C.size_t(0); i < dataLen/6; i++ {
 			ip := make([]byte, 4)
 			copy(ip, data[6*i:6*i+4])
-			port := uint16(data[6*i+4])*256 +
-				uint16(data[6*i+5])
+			port := binary.BigEndian.Uint16(data[6*i+4:])
 			globalEvents <- ValueEvent{hash, ip, port}
 		}
 	case 2: // DHT_EVENT_VALUES6
@@ -48,8 +48,7 @@ func dht_callback(
 		for i := C.size_t(0); i < dataLen/18; i++ {
 			ip := make([]byte, 16)
 			copy(ip, data[18*i:18*i+16])
-			port := uint16(data[18*i+16])*256 +
-				uint16(data[18*i+17])
+			port := binary.BigEndian.Uint16(data[18*i+16:])
 			globalEvents <- ValueEvent{hash, ip, port}
 		}
 	}

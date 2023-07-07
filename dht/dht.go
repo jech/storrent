@@ -7,6 +7,7 @@ package dht
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"log"
 	"math/rand"
@@ -510,14 +511,14 @@ func GetNodes() ([]net.TCPAddr, error) {
 	for i := 0; i < int(aCount); i++ {
 		ip := make([]byte, 4)
 		copy(ip, a[i*6:])
-		port := int(a[i*6+4])<<8 + int(a[i*6+5])
-		addrs = append(addrs, net.TCPAddr{IP: ip, Port: port})
+		port := binary.BigEndian.Uint16(a[i*6+4:])
+		addrs = append(addrs, net.TCPAddr{IP: ip, Port: int(port)})
 	}
 	for i := 0; i < int(a6Count); i++ {
 		ip := make([]byte, 16)
 		copy(ip, a6[i*18:])
-		port := int(a6[i*18+16])<<8 + int(a6[i*18+17])
-		addrs = append(addrs, net.TCPAddr{IP: ip, Port: port})
+		port := binary.BigEndian.Uint16(a6[i*18+16:])
+		addrs = append(addrs, net.TCPAddr{IP: ip, Port: int(port)})
 	}
 	return addrs, nil
 }
