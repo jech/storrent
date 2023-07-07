@@ -3,13 +3,15 @@ package protocol
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"errors"
-	"github.com/zeebo/bencode"
 	"io"
 	"log"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/zeebo/bencode"
 
 	"github.com/jech/storrent/config"
 	"github.com/jech/storrent/pex"
@@ -41,35 +43,15 @@ func PutBuffer(buf []byte) {
 }
 
 func readUint16(r *bufio.Reader) (uint16, error) {
-	a, err := r.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	b, err := r.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	return uint16(a)<<8 | uint16(b), nil
+	var v uint16
+	err := binary.Read(r, binary.BigEndian, &v)
+	return v, err
 }
 
 func readUint32(r *bufio.Reader) (uint32, error) {
-	a, err := r.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	b, err := r.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	c, err := r.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	d, err := r.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	return uint32(a)<<24 | uint32(b)<<16 | uint32(c)<<8 | uint32(d), nil
+	var v uint32
+	err := binary.Read(r, binary.BigEndian, &v)
+	return v, err
 }
 
 // Read reads a single BitTorrent message from r.  If l is not nil, then

@@ -124,7 +124,7 @@ type ftest struct {
 
 var failedMessages = []ftest{
 	ftest{"", io.EOF},
-	ftest{"\x00\x00", io.EOF},
+	ftest{"\x00\x00", io.ErrUnexpectedEOF},
 	ftest{"\x00\x00\x00\x01", io.EOF},
 	ftest{"\x00\x00\x00\x02\x00", ErrParse},
 	ftest{"\x00\x00\x00\x22\x14\x02" + "d5:piecei2e10:total_sizei65536ee",
