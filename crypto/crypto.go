@@ -6,6 +6,7 @@ import (
 	crand "crypto/rand"
 	"crypto/rc4"
 	"crypto/sha1"
+	"encoding/binary"
 	"errors"
 	"io"
 	"math/big"
@@ -74,8 +75,7 @@ func hash(v ...[]byte) []byte {
 
 func len2(v []byte) []byte {
 	w := make([]byte, 2)
-	w[0] = byte(len(v) >> 8)
-	w[1] = byte(len(v) & 0xFF)
+	binary.BigEndian.PutUint16(w, uint16(len(v)))
 	return w
 }
 
@@ -125,7 +125,7 @@ func writeWithPad(conn net.Conn, v *big.Int) <-chan error {
 	lbuf := make([]byte, 2)
 	crand.Read(lbuf)
 	lbuf[0] &= 1
-	length := uint16(lbuf[0])<<8 | uint16(lbuf[1])
+	length := binary.BigEndian.Uint16(lbuf)
 	buf := make([]byte, 768/8+int(length))
 	v.FillBytes(buf[:768/8])
 	crand.Read(buf[768/8:])
@@ -263,12 +263,8 @@ func ClientHandshake(c net.Conn, skey []byte, ia []byte, options *Options) (conn
 	stuff := decrypt(buf[:4+2])
 	buf = buf[4+2:]
 
-	cryptoSelect :=
-		uint32(stuff[0])<<24 |
-			uint32(stuff[1])<<16 |
-			uint32(stuff[2])<<8 |
-			uint32(stuff[3])
-	lenPadD := uint16(stuff[4])<<8 | uint16(stuff[5])
+	cryptoSelect := binary.BigEndian.Uint32(stuff)
+	lenPadD := binary.BigEndian.Uint16(stuff[4:])
 
 	if lenPadD > 0 {
 		buf, err = readMore(conn, buf, int(lenPadD), 0)
@@ -429,12 +425,8 @@ func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) 
 		err = errors.New("bad VC")
 		return
 	}
-	cryptoProvide :=
-		uint32(stuff[len(vc)+0])<<24 |
-			uint32(stuff[len(vc)+1])<<16 |
-			uint32(stuff[len(vc)+2])<<8 |
-			uint32(stuff[len(vc)+3])
-	lenPadC := uint16(stuff[len(vc)+4])<<8 | uint16(stuff[len(vc)+5])
+	cryptoProvide := binary.BigEndian.Uint32(stuff[len(vc):])
+	lenPadC := binary.BigEndian.Uint16(stuff[len(vc)+4:])
 
 	if cryptoProvide&3 == 0 {
 		err = errors.New("peer didn't provide a known crypto algorithm")
@@ -458,8 +450,7 @@ func ServerHandshake(c net.Conn, head []byte, skeys [][]byte, options *Options) 
 	eLenIa := buf[:2]
 	buf = buf[2:]
 	lenIaBuf := decrypt(eLenIa)
-
-	lenIa := uint16(lenIaBuf[0])<<8 | uint16(lenIaBuf[1])
+	lenIa := binary.BigEndian.Uint16(lenIaBuf)
 	buf, err = readMore(conn, buf, int(lenIa), 0)
 	if err != nil {
 		return
