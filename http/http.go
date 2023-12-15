@@ -590,8 +590,11 @@ func peers(w http.ResponseWriter, r *http.Request, t *tor.Torrent) {
 	footer(w)
 }
 
-func parseId(id []byte) string {
-	if id[0] == '-' && id[7] == '-' {
+func peerVersion(id []byte, version string) string {
+	if version != "" {
+		return version
+	}
+	if len(id) > 7 && id[0] == '-' && id[7] == '-' {
 		return string(id[1:7])
 	}
 	return ""
@@ -702,13 +705,12 @@ func hpeer(w http.ResponseWriter, p *peer.Peer, t *tor.Torrent) {
 	} else {
 		fmt.Fprintf(w, "<td></td>")
 	}
-	var version string
+
+	version := ""
 	if kp != nil {
 		version = kp.Version
 	}
-	if version == "" {
-		version = parseId(p.Id)
-	}
+	version = peerVersion(p.Id, version)
 	fmt.Fprintf(w, "<td>%v</td>", html.EscapeString(version))
 	fmt.Fprintf(w, "<td>%v</td></tr>", p.Id)
 }
@@ -749,7 +751,9 @@ func hknown(w http.ResponseWriter, kp *known.Peer, t *tor.Torrent) {
 	}
 
 	fmt.Fprintf(w, "<tr><td>%v</td><td>%v</td><td>%v</td><td>%v</td></tr>\n",
-		kp.Addr.String(), flags, html.EscapeString(kp.Version), kp.Id)
+		kp.Addr.String(), flags,
+		html.EscapeString(peerVersion(kp.Id, kp.Version)), kp.Id,
+	)
 }
 
 func torfile(w http.ResponseWriter, r *http.Request) {
