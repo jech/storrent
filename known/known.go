@@ -113,26 +113,21 @@ func (kp *Peer) ReallyBad() bool {
 	return kp.Badness > 50
 }
 
+func maxTime(ts... time.Time) time.Time {
+	max := time.Time{}
+	for _, t := range ts {
+		if max.Before(t) {
+			max = t
+		}
+	}
+	return max
+}
+
 func (kp *Peer) age() time.Duration {
-	when := kp.ActiveTime
-	if kp.SeenTime.After(when) {
-		when = kp.SeenTime
-	}
-	if kp.HeardTime.After(when) {
-		when = kp.HeardTime
-	}
-	if kp.ActiveTime.After(when) {
-		when = kp.ActiveTime
-	}
-	if kp.TrackerTime.After(when) {
-		when = kp.TrackerTime
-	}
-	if kp.DHTTime.After(when) {
-		when = kp.DHTTime
-	}
-	if kp.PEXTime.After(when) {
-		when = kp.PEXTime
-	}
+	when := maxTime(
+		kp.ActiveTime, kp.SeenTime, kp.HeardTime, kp.ActiveTime,
+		kp.TrackerTime, kp.DHTTime, kp.PEXTime,
+	)
 	return time.Since(when)
 }
 
