@@ -267,7 +267,9 @@ func main() {
 			proxy := config.DefaultProxy()
 			t, err := tor.ReadMagnet(proxy, arg)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("Read magnet: %v", err)
+				terminate <- nil
+				return
 			}
 			if t == nil {
 				t, err = tor.GetTorrent(ctx, proxy, arg)
