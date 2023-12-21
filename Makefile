@@ -42,7 +42,7 @@ ci-build: # build for ci, that can be called from Windows, MacOS or Linux
 	$(MAKE) print 
 	$(MAKE) clean-all
 	$(MAKE) build-debug
-	$(MAKE) data-bootstrap
+	#$(MAKE) data-bootstrap
 	$(MAKE) run-debug
 	@echo ""
 	@echo "CI BUILD ended ...."
