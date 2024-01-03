@@ -6,8 +6,8 @@ github.com/jackpal/gateway v1.0.10 h1:7g3fDo4Cd3RnTu6PzAfw6poO4Y81uNxrxFQFsBFSzJ
 github.com/jackpal/gateway v1.0.10/go.mod h1:+uPBgIllrbkwYCAoDkGSZbjvpre/bGYAFCYIcrH+LHs=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
-github.com/jech/portmap v0.0.0-20240102200557-e6325c65d431 h1:nZ13rkVarAafVmxbTG3nj3ZdIbR5ZwoTH+/E7dWgfkA=
-github.com/jech/portmap v0.0.0-20240102200557-e6325c65d431/go.mod h1:kzzVzieUB4zTD0yhjChmgBNX4EMEbINScYTu0hZvXsA=
+github.com/jech/portmap v0.0.0-20240103233046-dd300224e58f h1:pbnc0D8oDzZxOMZCX57+RT403ihP/g8fcIH+6zZGdP0=
+github.com/jech/portmap v0.0.0-20240103233046-dd300224e58f/go.mod h1:kzzVzieUB4zTD0yhjChmgBNX4EMEbINScYTu0hZvXsA=
 github.com/tv42/httpunix v0.0.0-20191220191345-2ba4b9c3382c h1:u6SKchux2yDvFQnDHS3lPnIRmfVJ5Sxy3ao2SIdysLQ=
 github.com/zeebo/bencode v1.0.0 h1:zgop0Wu1nu4IexAZeCZ5qbsjU4O1vMrfCrVgUjbHVuA=
 github.com/zeebo/bencode v1.0.0/go.mod h1:Ct7CkrWIQuLWAy9M3atFHYq4kG9Ao/SsY5cdtCXmp9Y=
