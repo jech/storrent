@@ -1,4 +1,5 @@
-// +build !linux,!windows
+//go:build !linux && !windows && !darwin && !dragonfly && !freebsd && !netbsd && !openbsd
+// +build !linux,!windows,!darwin,!dragonfly,!freebsd,!netbsd,!openbsd
 
 package physmem
 
