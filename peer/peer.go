@@ -140,6 +140,15 @@ func New(proxy string, conn net.Conn, ip net.IP, port int,
 	return peer
 }
 
+func (p *Peer) MultipathTCP() bool {
+	c, ok := p.conn.(*net.TCPConn)
+	if !ok {
+		return false
+	}
+	r, _ := c.MultipathTCP()
+	return r
+}
+
 func toChunk(peer *Peer, index uint32, begin uint32) uint32 {
 	cpp := peer.Pieces.PieceSize() / config.ChunkSize
 	if index > math.MaxUint32/cpp {

@@ -101,6 +101,9 @@ again:
 
 	if t.proxy == "" {
 		var dialer net.Dialer
+		if config.MultipathTCP {
+			dialer.SetMultipathTCP(true)
+		}
 		conn, err = dialer.DialContext(ctx, "tcp", s)
 	} else {
 		var u *url.URL

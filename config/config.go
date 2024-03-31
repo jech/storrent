@@ -122,4 +122,6 @@ var DefaultUseDht, DefaultDhtPassive, DefaultUseTrackers, DefaultUseWebseeds boo
 // newly created torrents.
 var PreferEncryption, ForceEncryption bool
 
+var MultipathTCP bool
+
 var Debug bool

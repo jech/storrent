@@ -687,6 +687,9 @@ func hpeer(w http.ResponseWriter, p *peer.Peer, t *tor.Torrent) {
 	if p.Encrypted() {
 		flags += "E"
 	}
+	if p.MultipathTCP() {
+		flags += "M"
+	}
 	if stats.AmUnchoking {
 		flags += "U"
 	} else if stats.Interested {

@@ -78,9 +78,10 @@ func main() {
 	flag.BoolVar(&config.ForceEncryption, "force-encryption", false,
 		"Force encryption")
 	flag.StringVar(&doPortmap, "portmap", "auto", "NAT port mappping `protocol` (natpmp, upnp, auto, or off)")
+	flag.BoolVar(&config.MultipathTCP, "mptcp", false,
+		"Use MP-TCP for peer-to-peer connections")
 	flag.BoolVar(&config.Debug, "debug", false,
 		"Log all BitTorrent messages")
-
 	flag.Parse()
 
 	err = config.SetDefaultProxy(proxyURL)
@@ -309,8 +310,14 @@ func main() {
 		}
 	}(flag.Args())
 
+	var lc net.ListenConfig
+	if config.MultipathTCP {
+		lc.SetMultipathTCP(true)
+	}
 	listener, err :=
-		net.Listen("tcp", fmt.Sprintf(":%v", config.ProtocolPort))
+		lc.Listen(context.Background(),
+			"tcp", fmt.Sprintf(":%v", config.ProtocolPort),
+		)
 	if err != nil {
 		log.Printf("Listen: %v", err)
 		return
