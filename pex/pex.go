@@ -28,7 +28,7 @@ func (p Peer) Equal(q Peer) bool {
 
 // Find find a peer in a list of peers.
 func Find(p Peer, l []Peer) int {
-	return slices.IndexFunc(l, func (q Peer) bool {
+	return slices.IndexFunc(l, func(q Peer) bool {
 		return p.Equal(q)
 	})
 }

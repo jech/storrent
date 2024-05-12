@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"slices"
 	"sort"
 	"sync/atomic"
 	"time"
@@ -338,15 +339,15 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		}
 		close(c.Ch)
 	case peer.TorGetPeer:
-		for _, p := range t.peers {
-			if p.Id.Equal(c.Id) {
-				c.Ch <- p
-				break
-			}
+		i := slices.IndexFunc(t.peers, func(p *peer.Peer) bool {
+			return p.Id.Equal(c.Id)
+		})
+		if i >= 0 {
+			c.Ch <- t.peers[i]
 		}
 		close(c.Ch)
 	case peer.TorGetPeers:
-		c.Ch <- append([]*peer.Peer(nil), t.peers...)
+		c.Ch <- slices.Clone(t.peers)
 		close(c.Ch)
 	case peer.TorGetKnown:
 		var p *known.Peer
@@ -542,15 +543,11 @@ func maybeWritePeer(p *peer.Peer, e peer.PeerEvent) error {
 
 // delPeer removes a peer after it sent TorPeerGoaway.
 func delPeer(t *Torrent, p *peer.Peer) bool {
-	var found bool
-	for i, q := range t.peers {
-		if q == p {
-			t.peers = append(t.peers[:i], t.peers[i+1:]...)
-			if len(t.peers) == 0 {
-				t.peers = nil
-			}
-			found = true
-			break
+	i := slices.Index(t.peers, p)
+	if i >= 0 {
+		t.peers = slices.Delete(t.peers, i, i+1)
+		if len(t.peers) == 0 {
+			t.peers = nil
 		}
 	}
 	// at this point, the dying peer won't reply to a GetPex request
@@ -562,7 +559,7 @@ func delPeer(t *Torrent, p *peer.Peer) bool {
 		}}
 		writePeers(t, peer.PeerPex{pp, false}, nil)
 	}
-	return found
+	return i >= 0
 }
 
 // setRequestInterval sets the interval of the request ticker.
@@ -930,8 +927,7 @@ outer:
 					(stats.Unchoked || isFast(p, fast)) &&
 					(stats.Seed || pbitmap.Get(int(p))) {
 					req = append(req, c)
-					chunks = append(chunks[:cn],
-						chunks[cn+1:]...)
+					chunks = slices.Delete(chunks, cn, cn+1)
 				} else {
 					cn++
 				}
@@ -1177,12 +1173,7 @@ func pickPriority(t *Torrent) int8 {
 }
 
 func isFast(i uint32, fast []uint32) bool {
-	for _, f := range fast {
-		if i == f {
-			return true
-		}
-	}
-	return false
+	return slices.Index(fast, i) >= 0
 }
 
 // pickIdlePieces chooses pieces to request when we are idle.
@@ -1470,10 +1461,11 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 }
 
 func findPeer(t *Torrent, id hash.Hash) *peer.Peer {
-	for _, p := range t.peers {
-		if id.Equal(p.Id) {
-			return p
-		}
+	i := slices.IndexFunc(t.peers, func(p *peer.Peer) bool {
+		return id.Equal(p.Id)
+	})
+	if i >= 0 {
+		return t.peers[i]
 	}
 	return nil
 }
