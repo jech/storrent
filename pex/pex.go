@@ -4,6 +4,7 @@ package pex
 import (
 	"encoding/binary"
 	"net"
+	"slices"
 )
 
 // Peer represents a peer known or announced over PEX.
@@ -27,12 +28,9 @@ func (p Peer) Equal(q Peer) bool {
 
 // Find find a peer in a list of peers.
 func Find(p Peer, l []Peer) int {
-	for i, q := range l {
-		if p.Equal(q) {
-			return i
-		}
-	}
-	return -1
+	return slices.IndexFunc(l, func (q Peer) bool {
+		return p.Equal(q)
+	})
 }
 
 // ParseCompact parses a list of PEX peers in compact format.

@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -912,8 +913,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 				r.Begin == m.Begin &&
 				r.Length == m.Length {
 				peer.requested =
-					append(peer.requested[0:i],
-						peer.requested[i+1:]...)
+					slices.Delete(peer.requested, i, i+1)
 				if len(peer.requested) == 0 {
 					peer.requested = nil
 				}
@@ -1045,8 +1045,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 		for _, p := range m.Dropped {
 			i := pex.Find(p, peer.pex)
 			if i >= 0 {
-				peer.pex =
-					append(peer.pex[:i], peer.pex[i+1:]...)
+				peer.pex = slices.Delete(peer.pex, i, i+1)
 				if len(peer.pex) == 0 {
 					peer.pex = nil
 				}
@@ -1124,12 +1123,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 }
 
 func isFast(peer *Peer, index uint32) bool {
-	for _, f := range peer.fast {
-		if f == index {
-			return true
-		}
-	}
-	return false
+	return slices.Index(peer.fast, index) >= 0
 }
 
 func rto(peer *Peer) time.Duration {
@@ -1438,8 +1432,7 @@ func (peer *Peer) CanMetadata() bool {
 func (state *pexState) add(p pex.Peer) {
 	i := pex.Find(p, state.pendingDel)
 	if i >= 0 {
-		state.pendingDel =
-			append(state.pendingDel[:i], state.pendingDel[i+1:]...)
+		state.pendingDel = slices.Delete(state.pendingDel, i, i+1)
 		if len(state.pendingDel) == 0 {
 			state.pendingDel = nil
 		}
@@ -1462,8 +1455,7 @@ func (state *pexState) add(p pex.Peer) {
 func (state *pexState) del(p pex.Peer) {
 	i := pex.Find(p, state.pending)
 	if i >= 0 {
-		state.pending =
-			append(state.pending[:i], state.pending[i+1:]...)
+		state.pending = slices.Delete(state.pending, i, i+1)
 		if len(state.pending) == 0 {
 			state.pending = nil
 		}
@@ -1474,7 +1466,7 @@ func (state *pexState) del(p pex.Peer) {
 	if i < 0 {
 		return
 	}
-	state.sent = append(state.sent[:i], state.sent[i+1:]...)
+	state.sent = slices.Delete(state.sent, i, i+1)
 	if len(state.sent) == 0 {
 		state.sent = nil
 	}
