@@ -1,9 +1,10 @@
 package tor
 
 import (
+	"cmp"
 	"crypto/sha1"
 	"errors"
-	"sort"
+	"slices"
 
 	"github.com/jech/storrent/hash"
 	"github.com/jech/storrent/peer"
@@ -99,14 +100,16 @@ func requestMetadata(t *Torrent, p *peer.Peer) error {
 	}
 
 	cn := t.rand.Perm(len(t.infoRequested))
-	sort.Slice(cn, func(i, j int) bool {
-		if !t.infoBitmap.Get(cn[i]) && t.infoBitmap.Get(cn[j]) {
-			return true
+	slices.SortFunc(cn, func(i, j int) int {
+		ai := t.infoBitmap.Get(i)
+		aj := t.infoBitmap.Get(j)
+		if !ai && aj {
+			return -1
 		}
-		if t.infoBitmap.Get(cn[i]) && !t.infoBitmap.Get(cn[j]) {
-			return false
+		if ai && !aj {
+			return 1
 		}
-		return t.infoRequested[cn[i]] < t.infoRequested[cn[j]]
+		return cmp.Compare(t.infoRequested[i], t.infoRequested[j])
 	})
 
 	j := 0

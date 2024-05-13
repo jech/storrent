@@ -2,6 +2,7 @@
 package tor
 
 import (
+	"cmp"
 	"context"
 	crand "crypto/rand"
 	"errors"
@@ -12,7 +13,6 @@ import (
 	"net"
 	"os"
 	"slices"
-	"sort"
 	"sync/atomic"
 	"time"
 
@@ -871,10 +871,8 @@ func periodicRequest(ctx context.Context, t *Torrent) {
 		return
 	}
 
-	sort.SliceStable(chunks, func(i, j int) bool {
-		fi := inFlight(t, chunks[i].index)
-		fj := inFlight(t, chunks[j].index)
-		return fi < fj
+	slices.SortStableFunc(chunks, func(a, b chunk) int {
+		return cmp.Compare(inFlight(t, a.index), inFlight(t, a.index))
 	})
 
 	if len(chunks) > count {
@@ -950,8 +948,8 @@ outer:
 	}
 
 	if !webseedDone && hasWebseeds(t) {
-		sort.SliceStable(chunks, func(i, j int) bool {
-			return chunks[i].index%cpp < chunks[j].index%cpp
+		slices.SortStableFunc(chunks, func(a, b chunk) int {
+			return cmp.Compare(a.index%cpp, b.index%cpp)
 		})
 		for _, c := range chunks {
 			if inFlight(t, c.index) == 0 {
@@ -1015,19 +1013,16 @@ func maybeWebseed(ctx context.Context, t *Torrent, index uint32, idle bool) bool
 	}
 
 	wn := t.rand.Perm(len(t.webseeds))
-	sort.Slice(wn, func(i, j int) bool {
-		wsi := t.webseeds[wn[i]]
-		wsj := t.webseeds[wn[j]]
-		if wsi.Count() < wsj.Count() {
-			return true
-		}
-		if wsi.Count() > wsj.Count() {
-			return false
+	slices.SortFunc(wn, func(i, j int) int {
+		wsi := t.webseeds[i]
+		wsj := t.webseeds[j]
+		if wsi.Count() != wsj.Count() {
+			return cmp.Compare(wsi.Count(), wsj.Count())
 		}
 		if t.rand.Intn(10) == 0 {
-			return false
+			return 1
 		}
-		return wsi.Rate() > wsj.Rate()
+		return cmp.Compare(wsj.Rate(), wsj.Rate())
 	})
 	var ws webseed.Webseed
 	for n := range wn {
@@ -1181,19 +1176,18 @@ func pickIdlePieces(t *Torrent, count int) {
 	maxp := t.Pieces.Num()
 	pcount := t.Pieces.Count()
 	ps := t.rand.Perm(maxp)
-	sort.Slice(ps, func(i, j int) bool {
-		p1 := uint32(ps[i])
-		p2 := uint32(ps[j])
+	slices.SortFunc(ps, func(i, j int) int {
+		p1 := uint32(i)
+		p2 := uint32(j)
 		// complete pieces last
 		c1 := t.Pieces.Complete(p1)
 		c2 := t.Pieces.Complete(p2)
 		if !c1 && c2 {
-			return true
+			return -1
 		} else if c1 && !c2 {
-			return false
-		}
-		if c1 && c2 {
-			return false
+			return 1
+		} else if c1 && c2 {
+			return 0
 		}
 
 		a1 := available(t, p1)
@@ -1201,21 +1195,21 @@ func pickIdlePieces(t *Torrent, count int) {
 		if !hasWebseeds(t) {
 			// unavailable last
 			if a1 > 0 && a2 == 0 {
-				return true
+				return -1
 			} else if a1 == 0 && a2 > 0 {
-				return false
+				return 1
 			}
 			if a1 == 0 && a2 == 0 {
-				return false
+				return 0
 			}
 		}
 		// empty pieces last
 		e1 := t.Pieces.PieceEmpty(p1)
 		e2 := t.Pieces.PieceEmpty(p2)
 		if !e1 && e2 {
-			return true
+			return -1
 		} else if e1 && !e2 {
-			return false
+			return 1
 		}
 		if e1 && e2 {
 			// both empty
@@ -1227,15 +1221,15 @@ func pickIdlePieces(t *Torrent, count int) {
 				if a2 == 0 {
 					a2 = 1
 				}
-				return a1 < a2
+				return cmp.Compare(a1, a2)
 			} else {
-				return false
+				return 0
 			}
 		}
 		// fewest chunks remaining
 		n1, b1 := t.Pieces.PieceBitmap(p1)
 		n2, b2 := t.Pieces.PieceBitmap(p2)
-		return n1-b1.Count() < n2-b2.Count()
+		return cmp.Compare(n1-b1.Count(), n2-b2.Count())
 	})
 
 	n := 0
@@ -1319,8 +1313,8 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 		i++
 	}
 
-	sort.Slice(peers, func(i, j int) bool {
-		return peers[i].Attempts < peers[j].Attempts
+	slices.SortFunc(peers, func(a, b *known.Peer) int {
+		return cmp.Compare(a.Attempts, b.Attempts)
 	})
 
 	count := 0
@@ -1389,16 +1383,17 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 		return
 	}
 
-	sort.Slice(unchoking, func(i, j int) bool {
-		s1 := unchoking[i].GetStatus()
-		s2 := unchoking[j].GetStatus()
-		if s2 == nil {
-			return false
+	slices.SortFunc(unchoking, func(a, b *peer.Peer) int {
+		s1 := a.GetStatus()
+		s2 := b.GetStatus()
+		if s1 == nil && s2 == nil {
+			return 0
+		} else if s2 == nil {
+			return -1
+		} else if s1 == nil {
+			return +1
 		}
-		if s1 == nil {
-			return true
-		}
-		return s1.UnchokeTime.Before(s2.UnchokeTime)
+		return s1.UnchokeTime.Compare(s2.UnchokeTime)
 	})
 
 	for len(unchoking) > maxUnchoking {
@@ -1411,27 +1406,27 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 	}
 
 	opportunistic := t.rand.Intn(5) == 0
-	sort.Slice(interested, func(i, j int) bool {
-		s1 := interested[i].GetStatus()
-		s2 := interested[j].GetStatus()
+	slices.SortFunc(interested, func(a, b *peer.Peer) int {
+		s1 := a.GetStatus()
+		s2 := a.GetStatus()
 
-		if s2 == nil {
-			return true
-		}
-		if s1 == nil {
-			return false
+		if s1 == nil && s2 == nil {
+			return 0
+		} else if s2 == nil {
+			return -1
+		} else if s1 == nil {
+			return +1
 		}
 
 		if !opportunistic {
-			if s1.AvgDownload > s2.AvgDownload {
-				return true
-			}
-			if s1.AvgDownload < s2.AvgDownload {
-				return false
+			if s1.AvgDownload != s2.AvgDownload {
+				return cmp.Compare(
+					s2.AvgDownload, s1.AvgDownload,
+				)
 			}
 		}
 
-		return s1.UnchokeTime.Before(s2.UnchokeTime)
+		return s1.UnchokeTime.Compare(s2.UnchokeTime)
 	})
 
 	n := 0

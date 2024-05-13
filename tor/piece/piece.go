@@ -3,11 +3,12 @@
 package piece
 
 import (
+	"cmp"
 	"crypto/sha1"
 	"errors"
 	"io"
 	"math/rand"
-	"sort"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -453,25 +454,22 @@ func (ps *Pieces) Expire(bytes int64, available []uint16, f func(index uint32)) 
 	}
 
 	a := rand.Perm(npieces)
-	sort.Slice(a, func(i, j int) bool {
-		if t[a[i]] >= 7200 && t[a[j]] >= 7200 {
+	slices.SortFunc(a, func(i, j int) int {
+		if t[i] >= 7200 && t[j] >= 7200 {
 			// commonest first
 			var ai, aj uint16
-			if a[i] < len(available) {
-				ai = available[a[i]]
+			if i < len(available) {
+				ai = available[i]
 			}
-			if a[j] < len(available) {
-				aj = available[a[j]]
+			if j < len(available) {
+				aj = available[j]
 			}
-			if ai > aj {
-				return true
-			}
-			if ai < aj {
-				return false
+			if ai != aj {
+				return cmp.Compare(aj, ai)
 			}
 		}
 		// least recently requested
-		return t[a[i]] > t[a[j]]
+		return cmp.Compare(t[j], t[i])
 	})
 
 	todo := ps.Bytes() - bytes
