@@ -50,19 +50,22 @@ func (p Path) Within(d Path) bool {
 	return true
 }
 
-// Less implements lexicographic ordering on paths.
-func (a Path) Less(b Path) bool {
+// Compare implements lexicographic ordering on paths.
+func (a Path) Compare(b Path) int {
 	for i := range a {
 		if i >= len(b) {
-			return false
+			return 1
 		}
 		if a[i] < b[i] {
-			return true
+			return -1
 		}
 		if a[i] > b[i] {
-			return false
+			return +1
 		}
 	}
 
-	return len(a) < len(b)
+	if len(a) < len(b) {
+		return -1
+	}
+	return 0
 }

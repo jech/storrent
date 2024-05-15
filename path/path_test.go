@@ -63,23 +63,23 @@ func TestWithin(t *testing.T) {
 	testWithin(t, "b/a", "a", false)
 }
 
-func testLess(t *testing.T, f, g string, expected bool) {
-	if result := Parse(f).Less(Parse(g)); result != expected {
+func testCompare(t *testing.T, f, g string, expected int) {
+	if result := Parse(f).Compare(Parse(g)); result != expected {
 		t.Errorf("Unexpected: %#v %#v -> %v (expected %v)",
 			Parse(f), Parse(g), result, expected,
 		)
 	}
 }
 
-func TestLess(t *testing.T) {
-	testLess(t, "", "", false)
-	testLess(t, "", "a", true)
-	testLess(t, "a", "", false)
-	testLess(t, "a", "b", true)
-	testLess(t, "b", "a", false)
-	testLess(t, "a/a", "a/b", true)
-	testLess(t, "a/b", "a/a", false)
-	testLess(t, "a/a", "b/a", true)
-	testLess(t, "b/a", "a/a", false)
+func TestCompare(t *testing.T) {
+	testCompare(t, "", "", 0)
+	testCompare(t, "", "a", -1)
+	testCompare(t, "a", "", 1)
+	testCompare(t, "a", "b", -1)
+	testCompare(t, "b", "a", 1)
+	testCompare(t, "a/a", "a/b", -1)
+	testCompare(t, "a/b", "a/a", 1)
+	testCompare(t, "a/a", "b/a", -1)
+	testCompare(t, "b/a", "a/a", 1)
 }
 

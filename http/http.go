@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,7 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -390,8 +391,8 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter, t *tor.Torrent, di
 				a = append(a, i)
 			}
 		}
-		sort.Slice(a, func(i, j int) bool {
-			return t.Files[a[i]].Path.Less(t.Files[a[j]].Path)
+		slices.SortFunc(a, func(i, j int) int {
+			return t.Files[i].Path.Compare(t.Files[j].Path)
 		})
 		var lastdir path.Path
 		available, _ := t.GetAvailable()
@@ -469,10 +470,11 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 		tors = append(tors, t)
 		return true
 	})
-	sort.Slice(tors, func(i, j int) bool {
-		return tors[i].Name < tors[j].Name ||
-			(tors[i].Name == tors[j].Name &&
-				bytes.Compare(tors[i].Hash, tors[j].Hash) < 0)
+	slices.SortFunc(tors, func(a, b *tor.Torrent) int {
+		if a.Name != b.Name {
+			return strings.Compare(a.Name, b.Name)
+		}
+		return bytes.Compare(a.Hash, b.Hash)
 	})
 	for _, t := range tors {
 		err := torrentEntry(ctx, w, t, path.Path(nil))
@@ -512,8 +514,8 @@ func peers(w http.ResponseWriter, r *http.Request, t *tor.Torrent) {
 		return
 	}
 
-	sort.Slice(ps, func(i, j int) bool {
-		return bytes.Compare(ps[i].Id, ps[j].Id) < 0
+	slices.SortFunc(ps, func(a, b *peer.Peer) int {
+		return bytes.Compare(a.Id, b.Id)
 	})
 	fmt.Fprintf(w, "<p><table>\n")
 	for _, p := range ps {
@@ -558,28 +560,26 @@ func peers(w http.ResponseWriter, r *http.Request, t *tor.Torrent) {
 		fmt.Fprintf(w, "</table></p>\n")
 	}
 
-	sort.Slice(kps, func(i, j int) bool {
-		v41 := kps[i].Addr.IP.To4()
-		v42 := kps[j].Addr.IP.To4()
+	slices.SortFunc(kps, func(a, b known.Peer) int {
+		v41 := a.Addr.IP.To4()
+		v42 := b.Addr.IP.To4()
 		var a1, a2 []byte
 		if v41 == nil && v42 != nil {
-			return true
+			return -1
 		} else if v41 != nil && v42 == nil {
-			return false
+			return 1
 		} else if v41 != nil && v42 != nil {
 			a1 = v41
 			a2 = v42
 		} else {
-			a1 = kps[i].Addr.IP.To16()
-			a2 = kps[j].Addr.IP.To16()
+			a1 = a.Addr.IP.To16()
+			a2 = b.Addr.IP.To16()
 		}
 		c := bytes.Compare(a1, a2)
-		if c < 0 {
-			return true
-		} else if c > 0 {
-			return false
+		if c != 0 {
+			return c
 		}
-		return kps[i].Addr.Port < kps[j].Addr.Port
+		return cmp.Compare(a.Addr.Port, b.Addr.Port)
 	})
 	fmt.Fprintf(w, "<p><table>\n")
 	for _, k := range kps {
@@ -859,8 +859,8 @@ func playlist(w http.ResponseWriter, r *http.Request, hash hash.Hash, dir path.P
 		for i := range a {
 			a[i] = i
 		}
-		sort.Slice(a, func(i, j int) bool {
-			return t.Files[a[i]].Path.Less(t.Files[a[j]].Path)
+		slices.SortFunc(a, func(i, j int) int {
+			return t.Files[i].Path.Compare(t.Files[i].Path)
 		})
 		for _, i := range a {
 			path := t.Files[i].Path
