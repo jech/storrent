@@ -2,6 +2,7 @@ package known
 
 import (
 	"net"
+	"slices"
 	"time"
 
 	"github.com/jech/storrent/hash"
@@ -113,21 +114,11 @@ func (kp *Peer) ReallyBad() bool {
 	return kp.Badness > 50
 }
 
-func maxTime(ts... time.Time) time.Time {
-	max := time.Time{}
-	for _, t := range ts {
-		if max.Before(t) {
-			max = t
-		}
-	}
-	return max
-}
-
 func (kp *Peer) age() time.Duration {
-	when := maxTime(
+	when := slices.MaxFunc([]time.Time{
 		kp.ActiveTime, kp.SeenTime, kp.HeardTime, kp.ActiveTime,
 		kp.TrackerTime, kp.DHTTime, kp.PEXTime,
-	)
+	}, func(a, b time.Time) int { return a.Compare(b) })
 	return time.Since(when)
 }
 
