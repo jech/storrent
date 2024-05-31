@@ -1022,7 +1022,7 @@ func maybeWebseed(ctx context.Context, t *Torrent, index uint32, idle bool) bool
 		if t.rand.Intn(10) == 0 {
 			return 1
 		}
-		return cmp.Compare(wsj.Rate(), wsj.Rate())
+		return cmp.Compare(wsj.Rate(), wsi.Rate())
 	})
 	var ws webseed.Webseed
 	for n := range wn {
@@ -1408,7 +1408,7 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 	opportunistic := t.rand.Intn(5) == 0
 	slices.SortFunc(interested, func(a, b *peer.Peer) int {
 		s1 := a.GetStatus()
-		s2 := a.GetStatus()
+		s2 := b.GetStatus()
 
 		if s1 == nil && s2 == nil {
 			return 0

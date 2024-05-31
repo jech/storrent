@@ -860,7 +860,7 @@ func playlist(w http.ResponseWriter, r *http.Request, hash hash.Hash, dir path.P
 			a[i] = i
 		}
 		slices.SortFunc(a, func(i, j int) int {
-			return t.Files[i].Path.Compare(t.Files[i].Path)
+			return t.Files[i].Path.Compare(t.Files[j].Path)
 		})
 		for _, i := range a {
 			path := t.Files[i].Path
