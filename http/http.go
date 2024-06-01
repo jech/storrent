@@ -314,13 +314,46 @@ func pathUrl(p path.Path) string {
 	return string(b[0 : len(b)-1])
 }
 
+func approx(v int64) string {
+	if v == 0 {
+		return "0"
+	}
+	if v < 2048 {
+		return fmt.Sprintf("%v B", v)
+	}
+	if v < 2048 * 1024 {
+		return fmt.Sprintf("%.0f kB", float64(v) / 1024)
+	}
+	if v < 2048 * 1024 * 1024 {
+		return fmt.Sprintf("%.0f MB", float64(v) / (1024 * 1024))
+	}
+	return fmt.Sprintf("%.0f GB", float64(v) / (1024 * 1024 * 1024))
+
+}
+
+func approxRate(v float64) string {
+	if v == 0 {
+		return "0"
+	}
+	if v < 2048 {
+		return fmt.Sprintf("%v B/s", v)
+	}
+	if v < 2048 * 1024 {
+		return fmt.Sprintf("%.0f kB/s", v / 1024)
+	}
+	if v < 2048 * 1024 * 1024 {
+		return fmt.Sprintf("%.0f MB/s", v / (1024 * 1024))
+	}
+	return fmt.Sprintf("%.0f GB/s", v / (1024 * 1024 * 1024))
+}
+
 func torrentFile(w io.Writer, hash hash.Hash, path path.Path, length int64, available int) {
 	p := pathUrl(path)
 	fmt.Fprintf(w,
 		"<tr><td><a href=\"/%v/%v\">%v</a></td>"+
 			"<td>%v</td><td>%v</td></tr>\n",
 		hash, p, html.EscapeString(path.String()),
-		length, available)
+		approx(length), available)
 }
 
 func torrentDir(w io.Writer, hash hash.Hash, pth path.Path, lastdir path.Path) {
@@ -357,12 +390,12 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter, t *tor.Torrent, di
 	fmt.Fprintf(w, "(<a href=\"/%v.m3u\">playlist</a>): ", hash)
 	c := t.Pieces.Bitmap().Count()
 	if t.InfoComplete() {
-		fmt.Fprintf(w, "%v bytes in %v+%v/%v pieces (%v bytes each), ",
-			t.Pieces.Bytes(),
+		fmt.Fprintf(w, "%v in %v+%v/%v pieces (%v each), ",
+			approx(t.Pieces.Bytes()),
 			c, t.Pieces.Count()-c,
 			(t.Pieces.Length()+int64(t.Pieces.PieceSize())-1)/
 				int64(t.Pieces.PieceSize()),
-			t.Pieces.PieceSize())
+			approx(int64(t.Pieces.PieceSize())))
 	}
 	stats, _ := t.GetStats()
 	if stats != nil {
@@ -451,9 +484,11 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "<form action=\"/?q=add\" method=\"post\">Magnet or URL: <input type=\"text\" name=\"url\"/> <input type=\"submit\"/></form> ")
 	fmt.Fprintf(w, "<form action=\"/?q=set\" method=\"post\">Idle download: <input type=\"text\" name=\"idle\"/> Upload: <input type=\"text\" name=\"upload\"/> <input type=\"submit\"/></form>\n")
 
-	fmt.Fprintf(w, "<p>Download %.0f/%v, upload %.0f/%.0f (unchoking %v), ",
-		peer.DownloadEstimator.Estimate(), config.IdleRate(),
-		peer.UploadEstimator.Estimate(), config.UploadRate(),
+	fmt.Fprintf(w, "<p>Download %v / %v, upload %v / %v (unchoking %v), ",
+		approxRate(peer.DownloadEstimator.Estimate()),
+		approxRate(float64(config.IdleRate())),
+		approxRate(peer.UploadEstimator.Estimate()),
+		approxRate(config.UploadRate()),
 		peer.NumUnchoking())
 
 	if dht.Available() {
@@ -462,8 +497,8 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 			g4, i4, g4+d4,
 			g6, i6, g6+d6)
 	}
-	fmt.Fprintf(w, "%v/%v bytes allocated.</p>\n",
-		alloc.Bytes(), config.MemoryHighMark())
+	fmt.Fprintf(w, "%v/%v allocated.</p>\n",
+		approx(alloc.Bytes()), approx(config.MemoryHighMark()))
 
 	var tors []*tor.Torrent
 	tor.Range(func(k hash.Hash, t *tor.Torrent) bool {
