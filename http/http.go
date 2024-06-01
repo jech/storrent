@@ -221,12 +221,12 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		idle := r.Form.Get("idle")
 		if idle != "" {
-			v, err := strconv.ParseFloat(idle, 64)
+			v, err := strconv.ParseInt(idle, 10, 32)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			config.SetIdleRate(v)
+			config.SetIdleRate(uint32(v))
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -451,7 +451,7 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "<form action=\"/?q=add\" method=\"post\">Magnet or URL: <input type=\"text\" name=\"url\"/> <input type=\"submit\"/></form> ")
 	fmt.Fprintf(w, "<form action=\"/?q=set\" method=\"post\">Idle download: <input type=\"text\" name=\"idle\"/> Upload: <input type=\"text\" name=\"upload\"/> <input type=\"submit\"/></form>\n")
 
-	fmt.Fprintf(w, "<p>Download %.0f/%.0f, upload %.0f/%.0f (unchoking %v), ",
+	fmt.Fprintf(w, "<p>Download %.0f/%v, upload %.0f/%.0f (unchoking %v), ",
 		peer.DownloadEstimator.Estimate(), config.IdleRate(),
 		peer.UploadEstimator.Estimate(), config.UploadRate(),
 		peer.NumUnchoking())

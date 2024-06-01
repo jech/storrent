@@ -807,7 +807,7 @@ func periodicRequest(ctx context.Context, t *Torrent) {
 			t.setRequestInterval(0)
 			return
 		}
-		rate = 2*irate - peer.DownloadEstimator.Estimate()
+		rate = 2*float64(irate) - peer.DownloadEstimator.Estimate()
 		if rate <= 0 {
 			t.setRequestInterval(slowInterval)
 			return

@@ -88,17 +88,12 @@ var idleRate uint32 = 64 * 1024
 
 // IdleRate is the download rate for which we aim when no client requests
 // any data.
-func IdleRate() float64 {
-	return float64(atomic.LoadUint32(&idleRate))
+func IdleRate() uint32 {
+	return atomic.LoadUint32(&idleRate)
 }
-func SetIdleRate(rate float64) {
-	if rate < 0 {
-		rate = 0
-	}
-	if rate > float64(^uint32(0)) {
-		rate = float64(^uint32(0))
-	}
-	atomic.StoreUint32(&idleRate, uint32(rate+0.5))
+
+func SetIdleRate(rate uint32) {
+	atomic.StoreUint32(&idleRate, rate)
 }
 
 var defaultProxyDialer atomic.Value
