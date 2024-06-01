@@ -336,7 +336,7 @@ func approxRate(v float64) string {
 		return "0"
 	}
 	if v < 2048 {
-		return fmt.Sprintf("%v B/s", v)
+		return fmt.Sprintf("%.0f B/s", v)
 	}
 	if v < 2048 * 1024 {
 		return fmt.Sprintf("%.0f kB/s", v / 1024)
