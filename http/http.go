@@ -314,18 +314,27 @@ func pathUrl(p path.Path) string {
 	return string(b[0 : len(b)-1])
 }
 
-func approx(v int64) string {
+func approxBytes(v int64) string {
 	if v == 0 {
 		return "0"
 	}
 	if v < 2048 {
 		return fmt.Sprintf("%v B", v)
 	}
+	if v < 1000 * 1024 {
+		return fmt.Sprintf("%.1f kB", float64(v) / 1024)
+	}
 	if v < 2048 * 1024 {
 		return fmt.Sprintf("%.0f kB", float64(v) / 1024)
 	}
+	if v < 1000 * 1024 * 1024 {
+		return fmt.Sprintf("%.1f MB", float64(v) / (1024 * 1024))
+	}
 	if v < 2048 * 1024 * 1024 {
 		return fmt.Sprintf("%.0f MB", float64(v) / (1024 * 1024))
+	}
+	if v < 1000 * 1024 * 1024 * 1024 {
+		return fmt.Sprintf("%.1f GB", float64(v) / (1024 * 1024 * 1024))
 	}
 	return fmt.Sprintf("%.0f GB", float64(v) / (1024 * 1024 * 1024))
 
@@ -338,13 +347,16 @@ func approxRate(v float64) string {
 	if v < 2048 {
 		return fmt.Sprintf("%.0f B/s", v)
 	}
+	if v < 1000 * 1024 {
+		return fmt.Sprintf("%.1f kB/s", v / 1024)
+	}
 	if v < 2048 * 1024 {
 		return fmt.Sprintf("%.0f kB/s", v / 1024)
 	}
-	if v < 2048 * 1024 * 1024 {
-		return fmt.Sprintf("%.0f MB/s", v / (1024 * 1024))
+	if v < 1000 * 1024 * 1024 {
+		return fmt.Sprintf("%.1f MB/s", v / (1024 * 1024))
 	}
-	return fmt.Sprintf("%.0f GB/s", v / (1024 * 1024 * 1024))
+	return fmt.Sprintf("%.0f MB/s", v / (1024 * 1024))
 }
 
 func torrentFile(w io.Writer, hash hash.Hash, path path.Path, length int64, available int) {
@@ -353,7 +365,7 @@ func torrentFile(w io.Writer, hash hash.Hash, path path.Path, length int64, avai
 		"<tr><td><a href=\"/%v/%v\">%v</a></td>"+
 			"<td>%v</td><td>%v</td></tr>\n",
 		hash, p, html.EscapeString(path.String()),
-		approx(length), available)
+		approxBytes(length), available)
 }
 
 func torrentDir(w io.Writer, hash hash.Hash, pth path.Path, lastdir path.Path) {
@@ -391,11 +403,11 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter, t *tor.Torrent, di
 	c := t.Pieces.Bitmap().Count()
 	if t.InfoComplete() {
 		fmt.Fprintf(w, "%v in %v+%v/%v pieces (%v each), ",
-			approx(t.Pieces.Bytes()),
+			approxBytes(t.Pieces.Bytes()),
 			c, t.Pieces.Count()-c,
 			(t.Pieces.Length()+int64(t.Pieces.PieceSize())-1)/
 				int64(t.Pieces.PieceSize()),
-			approx(int64(t.Pieces.PieceSize())))
+			approxBytes(int64(t.Pieces.PieceSize())))
 	}
 	stats, _ := t.GetStats()
 	if stats != nil {
@@ -497,8 +509,8 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 			g4, i4, g4+d4,
 			g6, i6, g6+d6)
 	}
-	fmt.Fprintf(w, "%v/%v allocated.</p>\n",
-		approx(alloc.Bytes()), approx(config.MemoryHighMark()))
+	fmt.Fprintf(w, "%v / %v allocated.</p>\n",
+		approxBytes(alloc.Bytes()), approxBytes(config.MemoryHighMark()))
 
 	var tors []*tor.Torrent
 	tor.Range(func(k hash.Hash, t *tor.Torrent) bool {
