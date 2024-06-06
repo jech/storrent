@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/jech/storrent/hash"
@@ -109,9 +110,46 @@ func DefaultProxy() string {
 	return defaultProxyDialer.Load().(string)
 }
 
-// DefaultUseDht, DefaultDhtPassive, DefaultUseTrackers, DefaultUseWebseeds
-// specify the options of newly created torrents.
-var DefaultUseDht, DefaultDhtPassive, DefaultUseTrackers, DefaultUseWebseeds bool
+type DhtMode int
+
+const (
+	DhtNone DhtMode = iota
+	DhtPassive
+	DhtNormal
+)
+
+func (m DhtMode) String() string {
+	switch m {
+	case DhtNone:
+		return "none"
+	case DhtPassive:
+		return "passive"
+	case DhtNormal:
+		return "normal"
+	default:
+		return fmt.Sprintf("unknown (%v)", int(m))
+	}
+}
+
+func ParseDhtMode(s string) (DhtMode, error) {
+	switch s {
+	case "none":
+		return DhtNone, nil
+	case "passive":
+		return DhtPassive, nil
+	case "normal":
+		return DhtNormal, nil
+	default:
+		return DhtNone, fmt.Errorf("unknown DHT mode %v", s)
+	}
+}
+
+// DefaultDhtMode specifies the DHT mode of newly created torrents.
+var DefaultDhtMode DhtMode
+
+// DefaultUseTrackers, DefaultUseWebseeds specify the options of newly
+// created torrents.
+var DefaultUseTrackers, DefaultUseWebseeds bool
 
 // PreferEncryption and ForceEncryption specify the encryption policy for
 // newly created torrents.

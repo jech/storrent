@@ -67,8 +67,7 @@ type Torrent struct {
 	requestSeconds  float64       // same in seconds
 	requestTicker   *time.Ticker  // governs sending chunk requests
 	announceTime    time.Time     // DHT
-	useDht          bool
-	dhtPassive      bool
+	dhtMode         config.DhtMode
 	useTrackers     bool
 	useWebseeds     bool
 }
@@ -99,8 +98,7 @@ func New(proxy string, hsh hash.Hash, dn string,
 		webseeds:     webseeds,
 		Name:         dn,
 		requested:    Requested{pieces: make(map[uint32]*RequestedPiece)},
-		useDht:       config.DefaultUseDht,
-		dhtPassive:   config.DefaultDhtPassive,
+		dhtMode:      config.DefaultDhtMode,
 		useTrackers:  config.DefaultUseTrackers,
 		useWebseeds:  config.DefaultUseWebseeds,
 		Log:          log.New(os.Stderr, "     ", log.LstdFlags),
@@ -123,11 +121,11 @@ func Announce(h hash.Hash, ipv6 bool) error {
 }
 
 func (t *Torrent) announce(ipv6 bool) {
-	if !t.useDht {
+	if t.dhtMode <= config.DhtNone {
 		return
 	}
 	var port uint16
-	if !t.hasProxy() && !t.dhtPassive {
+	if !t.hasProxy() && t.dhtMode >= config.DhtNormal {
 		port = uint16(config.ExternalPort(false, ipv6))
 	}
 	prot := "IPv4"
@@ -476,19 +474,15 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		t.announce(c.IPv6)
 	case peer.TorGetConf:
 		conf := peer.TorConf{
-			UseDht:      t.useDht,
-			DhtPassive:  t.dhtPassive,
+			DhtMode:     t.dhtMode,
 			UseTrackers: t.useTrackers,
 			UseWebseeds: t.useWebseeds,
 		}
 		c.Ch <- conf
 		close(c.Ch)
 	case peer.TorSetConf:
-		announce :=
-			(!t.useDht && c.Conf.UseDht) ||
-				(t.dhtPassive && !c.Conf.DhtPassive)
-		t.useDht = c.Conf.UseDht
-		t.dhtPassive = c.Conf.DhtPassive
+		announce := t.dhtMode < c.Conf.DhtMode
+		t.dhtMode = c.Conf.DhtMode
 		t.useTrackers = c.Conf.UseTrackers
 		t.useWebseeds = c.Conf.UseWebseeds
 		if c.Ch != nil {

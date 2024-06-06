@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jech/storrent/bitmap"
+	"github.com/jech/storrent/config"
 	"github.com/jech/storrent/hash"
 	"github.com/jech/storrent/known"
 	"github.com/jech/storrent/pex"
@@ -139,8 +140,7 @@ type TorAnnounce struct {
 }
 
 type TorConf struct {
-	UseDht      bool
-	DhtPassive  bool
+	DhtMode     config.DhtMode
 	UseTrackers bool
 	UseWebseeds bool
 }

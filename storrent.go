@@ -25,6 +25,7 @@ import (
 
 	"github.com/jech/storrent/config"
 	"github.com/jech/storrent/crypto"
+	"github.com/jech/storrent/dht"
 	"github.com/jech/storrent/fuse"
 	thttp "github.com/jech/storrent/http"
 	"github.com/jech/storrent/peer"
@@ -35,7 +36,7 @@ import (
 
 func main() {
 	var proxyURL, mountpoint string
-	var cpuprofile, memprofile, mutexprofile string
+	var cpuprofile, memprofile, mutexprofile, dhtMode string
 	var doPortmap string
 
 	mem, err := physmem.Total()
@@ -65,8 +66,9 @@ func main() {
 			"For tor, use \"socks5://127.0.0.1:9050\" and disable the DHT")
 	flag.StringVar(&mountpoint, "mountpoint", "",
 		"FUSE `mountpoint`")
-	flag.BoolVar(&config.DefaultDhtPassive, "dht-passive", false,
-		"Don't perform DHT announces")
+	if dht.Available() {
+		flag.StringVar(&dhtMode, "dht", "normal", "DHT mode")
+	}
 	flag.BoolVar(&config.DefaultUseTrackers, "use-trackers", false,
 		"Use trackers (if available)")
 	flag.BoolVar(&config.DefaultUseWebseeds, "use-webseeds", false,
@@ -83,6 +85,14 @@ func main() {
 	flag.BoolVar(&config.Debug, "debug", false,
 		"Log all BitTorrent messages")
 	flag.Parse()
+
+	if dht.Available() {
+		m, err := config.ParseDhtMode(dhtMode)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		config.DefaultDhtMode = m
+	}
 
 	err = config.SetDefaultProxy(proxyURL)
 	if err != nil {

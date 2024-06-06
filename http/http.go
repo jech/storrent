@@ -241,9 +241,14 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		dhtMode, err := config.ParseDhtMode(r.Form.Get("dht-mode"))
+		if err != nil {
+			http.Error(w, "couldn't parse dht-mode",
+				http.StatusBadRequest)
+			return
+		}
 		conf := peer.TorConf{
-			UseDht:      r.Form.Get("use-dht") != "",
-			DhtPassive:  r.Form.Get("dht-passive") != "",
+			DhtMode:     dhtMode,
 			UseTrackers: r.Form.Get("use-trackers") != "",
 			UseWebseeds: r.Form.Get("use-webseeds") != "",
 		}
@@ -459,13 +464,7 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter, t *tor.Torrent, di
 	fmt.Fprintf(w, "</table></p>\n")
 	conf, err := t.GetConf()
 	if err == nil {
-		var useDht, dhtPassive, useTrackers, useWebseeds string
-		if conf.UseDht {
-			useDht = " checked"
-		}
-		if conf.DhtPassive {
-			dhtPassive = " checked"
-		}
+		var useTrackers, useWebseeds string
 		if conf.UseTrackers {
 			useTrackers = " checked"
 		}
@@ -474,11 +473,22 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter, t *tor.Torrent, di
 		}
 		fmt.Fprintf(w, "<form action=\"/?q=set-torrent\" method=\"post\">\n")
 		if dht.Available() {
-			fmt.Fprintf(w, "<input type=\"checkbox\" id=\"use-dht-%v\" name=\"use-dht\"%v/><label for=\"use-dht-%v\">Use DHT</label> ", t.Hash, useDht, t.Hash)
-			fmt.Fprintf(w, "<input type=\"checkbox\" id=\"dht-passive-%v\" name=\"dht-passive\"%v/><label for=\"dht-passive-%v\">Passive DHT</label> ", t.Hash, dhtPassive, t.Hash)
+			fmt.Fprintf(w, "<label for=\"dht-mode-%v\">DHT mode:</label>\n", t.Hash)
+			fmt.Fprintf(w, "<select id=\"dht-mode-%v\" name=\"dht-mode\" style=\"margin-right: 1em\">\n", t.Hash)
+			for _, m := range []config.DhtMode{config.DhtNone, config.DhtPassive, config.DhtNormal} {
+				selected := ""
+				if conf.DhtMode == m {
+					selected = " selected"
+				}
+				fmt.Fprintf(w, "<option value=\"%v\"%v>%v</option>\n",
+					m, selected, m)
+			}
+			fmt.Fprintf(w, "</select>\n")
 		}
-		fmt.Fprintf(w, "<input type=\"checkbox\" id=\"use-trackers-%v\" name=\"use-trackers\"%v/><label for=\"use-trackers-%v\">Use trackers (%v)</label> ", t.Hash, useTrackers, t.Hash, stats.NumTrackers)
-		fmt.Fprintf(w, "<input type=\"checkbox\" id=\"use-webseeds-%v\" name=\"use-webseeds\"%v/><label for=\"use-webseeds-%v\">Use webseeds (%v)</label> ", t.Hash, useWebseeds, t.Hash, stats.NumWebseeds)
+		fmt.Fprintf(w, "<label for=\"use-trackers-%v\">Use trackers (%v):</label>\n", t.Hash, stats.NumTrackers)
+		fmt.Fprintf(w, "<input type=\"checkbox\" id=\"use-trackers-%v\" name=\"use-trackers\"%v/ style=\"margin-right: 1em\">\n", t.Hash, useTrackers)
+		fmt.Fprintf(w, "<label for=\"use-webseeds-%v\">Use webseeds (%v):</label>\n", t.Hash, stats.NumWebseeds)
+		fmt.Fprintf(w, "<input type=\"checkbox\" id=\"use-webseeds-%v\" name=\"use-webseeds\"%v/ style=\"margin-right: 1em\">\n ", t.Hash, useWebseeds)
 		fmt.Fprintf(w, "<button type=\"submit\" name=\"hash\" value=\"%v\">Set</button></form>\n", t.Hash)
 	}
 	fmt.Fprintf(w, "<form action=\"/?q=delete\" class=\"delete-form\" method=\"post\"><button type=\"submit\" name=\"hash\" value=\"%v\">Delete</button></form>\n",
