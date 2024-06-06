@@ -242,10 +242,10 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		conf := peer.TorConf{
-			UseDht:      peer.ConfGet(r.Form.Get("use-dht") != ""),
-			DhtPassive:  peer.ConfGet(r.Form.Get("dht-passive") != ""),
-			UseTrackers: peer.ConfGet(r.Form.Get("use-trackers") != ""),
-			UseWebseeds: peer.ConfGet(r.Form.Get("use-webseeds") != ""),
+			UseDht:      r.Form.Get("use-dht") != "",
+			DhtPassive:  r.Form.Get("dht-passive") != "",
+			UseTrackers: r.Form.Get("use-trackers") != "",
+			UseWebseeds: r.Form.Get("use-webseeds") != "",
 		}
 		err = t.SetConf(conf)
 		if err != nil {
@@ -321,22 +321,22 @@ func approxBytes(v int64) string {
 	if v < 2048 {
 		return fmt.Sprintf("%v B", v)
 	}
-	if v < 1000 * 1024 {
-		return fmt.Sprintf("%.1f kB", float64(v) / 1024)
+	if v < 1000*1024 {
+		return fmt.Sprintf("%.1f kB", float64(v)/1024)
 	}
-	if v < 2048 * 1024 {
-		return fmt.Sprintf("%.0f kB", float64(v) / 1024)
+	if v < 2048*1024 {
+		return fmt.Sprintf("%.0f kB", float64(v)/1024)
 	}
-	if v < 1000 * 1024 * 1024 {
-		return fmt.Sprintf("%.1f MB", float64(v) / (1024 * 1024))
+	if v < 1000*1024*1024 {
+		return fmt.Sprintf("%.1f MB", float64(v)/(1024*1024))
 	}
-	if v < 2048 * 1024 * 1024 {
-		return fmt.Sprintf("%.0f MB", float64(v) / (1024 * 1024))
+	if v < 2048*1024*1024 {
+		return fmt.Sprintf("%.0f MB", float64(v)/(1024*1024))
 	}
-	if v < 1000 * 1024 * 1024 * 1024 {
-		return fmt.Sprintf("%.1f GB", float64(v) / (1024 * 1024 * 1024))
+	if v < 1000*1024*1024*1024 {
+		return fmt.Sprintf("%.1f GB", float64(v)/(1024*1024*1024))
 	}
-	return fmt.Sprintf("%.0f GB", float64(v) / (1024 * 1024 * 1024))
+	return fmt.Sprintf("%.0f GB", float64(v)/(1024*1024*1024))
 
 }
 
@@ -347,16 +347,16 @@ func approxRate(v float64) string {
 	if v < 2048 {
 		return fmt.Sprintf("%.0f B/s", v)
 	}
-	if v < 1000 * 1024 {
-		return fmt.Sprintf("%.1f kB/s", v / 1024)
+	if v < 1000*1024 {
+		return fmt.Sprintf("%.1f kB/s", v/1024)
 	}
-	if v < 2048 * 1024 {
-		return fmt.Sprintf("%.0f kB/s", v / 1024)
+	if v < 2048*1024 {
+		return fmt.Sprintf("%.0f kB/s", v/1024)
 	}
-	if v < 1000 * 1024 * 1024 {
-		return fmt.Sprintf("%.1f MB/s", v / (1024 * 1024))
+	if v < 1000*1024*1024 {
+		return fmt.Sprintf("%.1f MB/s", v/(1024*1024))
 	}
-	return fmt.Sprintf("%.0f MB/s", v / (1024 * 1024))
+	return fmt.Sprintf("%.0f MB/s", v/(1024*1024))
 }
 
 func torrentFile(w io.Writer, hash hash.Hash, path path.Path, length int64, available int) {
@@ -460,16 +460,16 @@ func torrentEntry(ctx context.Context, w http.ResponseWriter, t *tor.Torrent, di
 	conf, err := t.GetConf()
 	if err == nil {
 		var useDht, dhtPassive, useTrackers, useWebseeds string
-		if conf.UseDht == peer.ConfTrue {
+		if conf.UseDht {
 			useDht = " checked"
 		}
-		if conf.DhtPassive == peer.ConfTrue {
+		if conf.DhtPassive {
 			dhtPassive = " checked"
 		}
-		if conf.UseTrackers == peer.ConfTrue {
+		if conf.UseTrackers {
 			useTrackers = " checked"
 		}
-		if conf.UseWebseeds == peer.ConfTrue {
+		if conf.UseWebseeds {
 			useWebseeds = " checked"
 		}
 		fmt.Fprintf(w, "<form action=\"/?q=set-torrent\" method=\"post\">\n")

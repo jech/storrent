@@ -476,21 +476,21 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		t.announce(c.IPv6)
 	case peer.TorGetConf:
 		conf := peer.TorConf{
-			UseDht:      peer.ConfGet(t.useDht),
-			DhtPassive:  peer.ConfGet(t.dhtPassive),
-			UseTrackers: peer.ConfGet(t.useTrackers),
-			UseWebseeds: peer.ConfGet(t.useWebseeds),
+			UseDht:      t.useDht,
+			DhtPassive:  t.dhtPassive,
+			UseTrackers: t.useTrackers,
+			UseWebseeds: t.useWebseeds,
 		}
 		c.Ch <- conf
 		close(c.Ch)
 	case peer.TorSetConf:
 		announce :=
-			(!t.useDht && c.Conf.UseDht == peer.ConfTrue) ||
-				(t.dhtPassive && c.Conf.DhtPassive == peer.ConfFalse)
-		peer.ConfSet(&t.useDht, c.Conf.UseDht)
-		peer.ConfSet(&t.dhtPassive, c.Conf.DhtPassive)
-		peer.ConfSet(&t.useTrackers, c.Conf.UseTrackers)
-		peer.ConfSet(&t.useWebseeds, c.Conf.UseWebseeds)
+			(!t.useDht && c.Conf.UseDht) ||
+				(t.dhtPassive && !c.Conf.DhtPassive)
+		t.useDht = c.Conf.UseDht
+		t.dhtPassive = c.Conf.DhtPassive
+		t.useTrackers = c.Conf.UseTrackers
+		t.useWebseeds = c.Conf.UseWebseeds
 		if c.Ch != nil {
 			close(c.Ch)
 		}

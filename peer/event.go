@@ -138,35 +138,11 @@ type TorAnnounce struct {
 	IPv6 bool
 }
 
-type ConfValue int
-
-const (
-	ConfUnknown ConfValue = 0
-	ConfFalse   ConfValue = 1
-	ConfTrue    ConfValue = 2
-)
-
-func ConfGet(v bool) ConfValue {
-	if v {
-		return ConfTrue
-	}
-	return ConfFalse
-}
-
-func ConfSet(dst *bool, v ConfValue) {
-	switch v {
-	case ConfTrue:
-		*dst = true
-	case ConfFalse:
-		*dst = false
-	}
-}
-
 type TorConf struct {
-	UseDht      ConfValue
-	DhtPassive  ConfValue
-	UseTrackers ConfValue
-	UseWebseeds ConfValue
+	UseDht      bool
+	DhtPassive  bool
+	UseTrackers bool
+	UseWebseeds bool
 }
 
 type TorSetConf struct {
