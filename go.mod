@@ -4,10 +4,10 @@ go 1.21
 
 require (
 	bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5
-	github.com/jech/portmap v0.0.0-20240103233046-dd300224e58f
+	github.com/jech/portmap v0.0.0-20240609101148-1151a9a8a46b
 	github.com/zeebo/bencode v1.0.0
-	golang.org/x/net v0.24.0
-	golang.org/x/sys v0.19.0
+	golang.org/x/net v0.26.0
+	golang.org/x/sys v0.21.0
 )
 
 require (
