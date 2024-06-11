@@ -1,7 +1,7 @@
 package known
 
 import (
-	"net"
+	"net/netip"
 	"slices"
 	"time"
 
@@ -9,7 +9,7 @@ import (
 )
 
 type Peer struct {
-	Addr               net.TCPAddr
+	Addr               netip.AddrPort
 	Id                 hash.Hash
 	TrackerTime        time.Time
 	DHTTime            time.Time
@@ -24,12 +24,7 @@ type Peer struct {
 	Version            string
 }
 
-type key struct {
-	ip   [16]byte
-	port uint16
-}
-
-type Peers map[key]*Peer
+type Peers map[netip.AddrPort]*Peer
 
 type Kind int
 
@@ -138,22 +133,9 @@ func (ps Peers) Expire() {
 	}
 }
 
-func toKey(ip net.IP, port int) key {
-	k := key{}
-	copy(k.ip[:], ip.To16())
-	k.port = uint16(port)
-	return k
-}
+func Find(peers Peers, addr netip.AddrPort, id hash.Hash, version string, kind Kind) *Peer {
 
-func Find(peers Peers, ip net.IP, port int, id hash.Hash, version string,
-	kind Kind) *Peer {
-
-	if port < 0 || port > 0xFFFF {
-		return nil
-	}
-
-	key := toKey(ip, port)
-	kp := peers[key]
+	kp := peers[addr]
 
 	if kp != nil {
 		if id != nil && kp.Id != nil && !id.Equal(kp.Id) {
@@ -170,20 +152,20 @@ func Find(peers Peers, ip net.IP, port int, id hash.Hash, version string,
 		return nil
 	}
 
-	if !ip.IsGlobalUnicast() {
+	if !addr.Addr().IsGlobalUnicast() {
 		return nil
 	}
-	kp = &Peer{Addr: net.TCPAddr{IP: ip, Port: port}, Id: id}
+	kp = &Peer{Addr: addr, Id: id}
 	kp.Update(version, kind)
-	peers[key] = kp
+	peers[addr] = kp
 	return kp
 }
 
-func FindId(peers Peers, id hash.Hash, ip net.IP, port int) *Peer {
+func FindId(peers Peers, id hash.Hash, addr netip.AddrPort) *Peer {
 	for _, kp := range peers {
-		if kp.Addr.IP.Equal(ip) &&
-			(port == 0 || kp.Addr.Port == port) &&
-			kp.Id != nil && id.Equal(kp.Id) {
+		if (kp.Addr == addr ||
+			(addr.Port() == 0 && kp.Addr.Addr() == addr.Addr())) &&
+			(kp.Id != nil && id.Equal(kp.Id)) {
 			return kp
 		}
 	}

@@ -3,8 +3,8 @@ package tor
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 
 	"golang.org/x/net/proxy"
@@ -22,9 +22,7 @@ var ErrDuplicateConnection = errors.New("duplicate connection")
 // Server accepts a peer connection.
 func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 	addr, ok := conn.RemoteAddr().(*net.TCPAddr)
-	if !ok {
-		addr = nil
-	} else if !addr.IP.IsGlobalUnicast() {
+	if !ok || !addr.IP.IsGlobalUnicast() {
 		conn.Close()
 		return ErrMartianAddress
 	}
@@ -72,11 +70,14 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 		return ErrDuplicateConnection
 	}
 
-	var ip net.IP
-	if addr != nil {
-		ip = addr.IP
+	ipp, ok := netip.AddrFromSlice(addr.IP)
+	if !ok {
+		conn.Close()
+		return errors.New("couldn't parse address")
 	}
-	err = t.NewPeer(t.proxy, conn, ip, 0, true, result, init)
+	err = t.NewPeer(
+		t.proxy, conn, netip.AddrPortFrom(ipp, 0), true, result, init,
+	)
 	if err != nil {
 		conn.Close()
 		return err
@@ -85,7 +86,7 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 }
 
 // DialClient connects to a peer.
-func DialClient(ctx context.Context, t *Torrent, ip net.IP, port int, cryptoOptions *crypto.Options) error {
+func DialClient(ctx context.Context, t *Torrent, addr netip.AddrPort, cryptoOptions *crypto.Options) error {
 	var conn net.Conn
 	var err error
 	cryptoHandshake :=
@@ -97,14 +98,19 @@ again:
 		return err
 	}
 
-	s := net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port))
+	if !addr.Addr().IsGlobalUnicast() {
+		return ErrMartianAddress
+	}
+	if port := addr.Port(); port == 0 || port == 1 || port == 22 || port == 25 {
+		return errors.New("bad port")
+	}
 
 	if t.proxy == "" {
 		var dialer net.Dialer
 		if config.MultipathTCP {
 			dialer.SetMultipathTCP(true)
 		}
-		conn, err = dialer.DialContext(ctx, "tcp", s)
+		conn, err = dialer.DialContext(ctx, "tcp", addr.String())
 	} else {
 		var u *url.URL
 		u, err = url.Parse(t.proxy)
@@ -120,7 +126,7 @@ again:
 		if !ok {
 			return errors.New("dialer is not ContextDialer")
 		}
-		conn, err = d.DialContext(ctx, "tcp", s)
+		conn, err = d.DialContext(ctx, "tcp", addr.String())
 	}
 	if err != nil {
 		return err
@@ -131,14 +137,7 @@ again:
 		return err
 	}
 
-	if !ip.IsGlobalUnicast() {
-		return ErrMartianAddress
-	}
-	if port == 0 || port == 1 || port == 22 || port == 25 {
-		return errors.New("bad port")
-	}
-
-	err = Client(conn, t, ip, port, t.proxy, cryptoHandshake, cryptoOptions)
+	err = Client(conn, t, addr, t.proxy, cryptoHandshake, cryptoOptions)
 	if errors.Is(err, protocol.ErrBadHandshake) {
 		if cryptoOptions.PreferCryptoHandshake &&
 			!cryptoOptions.ForceCryptoHandshake {
@@ -160,7 +159,7 @@ again:
 }
 
 // Client establishes a connection with a client.
-func Client(conn net.Conn, t *Torrent, ip net.IP, port int, proxy string, cryptoHandshake bool, cryptoOptions *crypto.Options) error {
+func Client(conn net.Conn, t *Torrent, addr netip.AddrPort, proxy string, cryptoHandshake bool, cryptoOptions *crypto.Options) error {
 
 	stats, err := t.GetStats()
 	if err != nil {
@@ -181,7 +180,7 @@ func Client(conn net.Conn, t *Torrent, ip net.IP, port int, proxy string, crypto
 		return err
 	}
 
-	err = t.AddKnown(ip, port, result.Id, "", known.Seen)
+	err = t.AddKnown(addr, result.Id, "", known.Seen)
 	if err != nil {
 		conn.Close()
 		return err
@@ -198,7 +197,7 @@ func Client(conn net.Conn, t *Torrent, ip net.IP, port int, proxy string, crypto
 		return ErrDuplicateConnection
 	}
 
-	err = t.NewPeer(proxy, conn, ip, port, false, result, init)
+	err = t.NewPeer(proxy, conn, addr, false, result, init)
 	if err != nil {
 		conn.Close()
 		return err

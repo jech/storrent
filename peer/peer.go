@@ -54,7 +54,7 @@ type Peer struct {
 	infoHash          hash.Hash
 	Counter           uint32
 	Id                hash.Hash
-	IP                net.IP
+	IP                netip.Addr
 	Port              uint32
 	Incoming          bool
 	conn              net.Conn
@@ -112,7 +112,7 @@ var ErrMetadataIncomplete = errors.New("metadata incomplete")
 var ErrCannotFast = errors.New("peer doesn't implement Fast extension")
 var ErrRange = errors.New("value out of range")
 
-func New(proxy string, conn net.Conn, ip net.IP, port int,
+func New(proxy string, conn net.Conn, addr netip.AddrPort,
 	incoming bool, result protocol.HandshakeResult) *Peer {
 	counter := atomic.AddUint32(&peerCounter, 1)
 	if counter == 0 {
@@ -124,8 +124,8 @@ func New(proxy string, conn net.Conn, ip net.IP, port int,
 		infoHash:    result.Hash,
 		Counter:     counter,
 		Id:          result.Id,
-		IP:          ip,
-		Port:        uint32(port),
+		IP:          addr.Addr(),
+		Port:        uint32(addr.Port()),
 		conn:        conn,
 		Incoming:    incoming,
 		canDHT:      result.Dht,
@@ -236,15 +236,17 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 	peer.writeTime = time.Now()
 	if peer.Port > 0 {
 		writeEvent(peer, TorAddKnown{peer,
-			peer.IP, int(peer.Port), peer.Id, "",
-			known.ActiveNoReset,
+			netip.AddrPortFrom(peer.IP, uint16(peer.Port)),
+			peer.Id, "", known.ActiveNoReset,
 		})
 	}
 
 	if peer.canDHT && !hasProxy(peer) {
 		write(peer,
-			protocol.Port{uint16(config.ExternalPort(false,
-				peer.IP.To4() == nil))})
+			protocol.Port{uint16(config.ExternalPort(
+				false, peer.IP.Is6(),
+			))},
+		)
 	}
 
 	if peer.canExtended {
@@ -253,8 +255,9 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 		var ipv6 netip.Addr
 		if !hasProxy(peer) {
 			version = "STorrent 0.0"
-			port = uint16(config.ExternalPort(true,
-				peer.IP.To4() == nil))
+			port = uint16(config.ExternalPort(
+				true, peer.IP.Is6(),
+			))
 			ipv6 = getIPv6()
 		}
 		err := write(peer, protocol.Extended0{
@@ -412,9 +415,7 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 			if time.Since(peer.pexTorTime) >= 20*time.Minute {
 				for _, p := range peer.pex {
 					writeEvent(peer, TorAddKnown{peer,
-						p.Addr.Addr().AsSlice(),
-						int(p.Addr.Port()),
-						nil, "", known.PEX,
+						p.Addr, nil, "", known.PEX,
 					})
 				}
 				peer.pexTorTime = time.Now()
@@ -612,14 +613,11 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 			if !peer.Incoming {
 				flags |= pex.Outgoing
 			}
-			ip, ok := netip.AddrFromSlice(peer.IP)
-			if ok {
-				c.Ch <- pex.Peer{
-					Addr: netip.AddrPortFrom(
-						ip, uint16(peer.Port),
-					),
-					Flags: flags,
-				}
+			c.Ch <- pex.Peer{
+				Addr: netip.AddrPortFrom(
+					peer.IP, uint16(peer.Port),
+				),
+				Flags: flags,
 			}
 		}
 		close(c.Ch)
@@ -795,7 +793,10 @@ func (peer *Peer) active() {
 	if time.Since(peer.lastActive) > 5*time.Second {
 		if peer.Port != 0 {
 			writeEvent(peer, TorAddKnown{peer,
-				peer.IP, int(peer.Port), nil, "", known.Active,
+				netip.AddrPortFrom(
+					peer.IP, uint16(peer.Port),
+				),
+				nil, "", known.Active,
 			})
 		}
 		peer.lastActive = time.Now()
@@ -936,13 +937,10 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 		}
 		peer.startStopUpload()
 	case protocol.Port:
-		if peer.IP != nil {
-			ip, ok := netip.AddrFromSlice(peer.IP)
-			if ok {
-				dht.Ping(netip.AddrPortFrom(
-					ip, uint16(peer.Port),
-				))
-			}
+		if peer.Port > 0 {
+			dht.Ping(netip.AddrPortFrom(
+				peer.IP, uint16(peer.Port),
+			))
 		}
 	case protocol.SuggestPiece:
 		if !peer.canFast {
@@ -1004,7 +1002,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 		}
 		peer.gotExtended = true
 		if m.Port != 0 {
-			if peer.Port != 0 && uint32(m.Port) != peer.Port {
+			if peer.Port != 0 && m.Port != uint16(peer.Port) {
 				peer.Log.Printf("Inconsistent port (%v, %v)",
 					m.Port, peer.Port)
 			} else {
@@ -1012,15 +1010,15 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			}
 			k := func(ip netip.Addr, kind known.Kind) {
 				writeEvent(peer, TorAddKnown{peer,
-					ip.AsSlice(), int(peer.Port), peer.Id,
+					netip.AddrPortFrom(
+						ip, uint16(peer.Port),
+					),
+					peer.Id,
 					m.Version, kind,
 				})
 			}
-			ip, ok := netip.AddrFromSlice(peer.IP)
-			if ok {
-				k(ip, known.ActiveNoReset)
-				k(ip, known.Seen)
-			}
+			k(peer.IP, known.ActiveNoReset)
+			k(peer.IP, known.Seen)
 			var zeroaddr netip.Addr
 			if m.IPv4 != zeroaddr {
 				k(m.IPv4, known.Heard)
@@ -1054,9 +1052,7 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			} else {
 				peer.pex = append(peer.pex, p)
 				writeEvent(peer, TorAddKnown{peer,
-					p.Addr.Addr().AsSlice(),
-					int(p.Addr.Port()),
-					nil, "", known.PEX,
+					p.Addr, nil, "", known.PEX,
 				})
 			}
 		}
@@ -1570,6 +1566,7 @@ func (p *Peer) Encrypted() bool {
 	return ok
 }
 
-func (p *Peer) GetPort() int {
-	return int(atomic.LoadUint32(&p.Port))
+func (p *Peer) GetAddr() netip.AddrPort {
+	port := atomic.LoadUint32(&p.Port)
+	return netip.AddrPortFrom(p.IP, uint16(port))
 }

@@ -227,9 +227,9 @@ func (t *Torrent) run(ctx context.Context) {
 
 func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 	active := func(p *peer.Peer) {
-		pp := p.GetPort()
-		if pp > 0 {
-			known.Find(t.known, p.IP, pp, nil, "", known.Active)
+		addr := p.GetAddr()
+		if addr.Port() > 0 {
+			known.Find(t.known, addr, nil, "", known.Active)
 		}
 	}
 	switch c := c.(type) {
@@ -285,7 +285,7 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		}
 	case peer.TorAddKnown:
 		kp := known.Find(t.known,
-			c.IP, int(c.Port), c.Id, c.Version, c.Kind)
+			c.Addr, c.Id, c.Version, c.Kind)
 		if kp != nil && c.Peer != nil && c.Kind == known.Seen {
 			if kp.ReallyBad() {
 				writePeer(c.Peer, peer.PeerDone{})
@@ -294,14 +294,14 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 	case peer.TorBadPeer:
 		for _, p := range t.peers {
 			if c.Peer == p.Counter {
-				port := p.GetPort()
-				if port > 0 {
+				addr := p.GetAddr()
+				if addr.Port() > 0 {
 					bad := known.Good
 					if c.Bad {
 						bad = known.Bad
 					}
 					kp := known.Find(t.known,
-						p.IP, port, nil, "", bad)
+						addr, nil, "", bad)
 					if kp != nil && kp.Bad() &&
 						t.rand.Intn(5) == 0 {
 						writePeer(p, peer.PeerDone{})
@@ -351,10 +351,9 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 	case peer.TorGetKnown:
 		var p *known.Peer
 		if c.Id == nil {
-			p = known.Find(t.known, c.IP, c.Port, nil, "",
-				known.None)
+			p = known.Find(t.known, c.Addr, nil, "", known.None)
 		} else {
-			p = known.FindId(t.known, c.Id, c.IP, c.Port)
+			p = known.FindId(t.known, c.Id, c.Addr)
 		}
 		if p != nil {
 			c.Ch <- *p
@@ -546,15 +545,12 @@ func delPeer(t *Torrent, p *peer.Peer) bool {
 		}
 	}
 	// at this point, the dying peer won't reply to a GetPex request
-	port := p.GetPort()
-	if port > 0 {
-		ip, ok := netip.AddrFromSlice(p.IP)
-		if ok {
-			pp := []pex.Peer{{
-				Addr: netip.AddrPortFrom(ip, uint16(port)),
-			}}
-			writePeers(t, peer.PeerPex{pp, false}, nil)
-		}
+	addr := p.GetAddr()
+	if addr.Port() > 0 {
+		pp := []pex.Peer{{
+			Addr: addr,
+		}}
+		writePeers(t, peer.PeerPex{pp, false}, nil)
 	}
 	return i >= 0
 }
@@ -1341,7 +1337,7 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 				return
 			case <-timer.C:
 			}
-			err := DialClient(ctx, t, kp.Addr.IP, kp.Addr.Port,
+			err := DialClient(ctx, t, kp.Addr,
 				crypto.DefaultOptions(
 					config.PreferEncryption,
 					config.ForceEncryption,
@@ -1482,12 +1478,12 @@ func (t *Torrent) Kill(ctx context.Context) error {
 	}
 }
 
-func (t *Torrent) NewPeer(proxy string, conn net.Conn, ip net.IP, port int, incoming bool, result protocol.HandshakeResult, init []byte) error {
+func (t *Torrent) NewPeer(proxy string, conn net.Conn, addr netip.AddrPort, incoming bool, result protocol.HandshakeResult, init []byte) error {
 	if !result.Hash.Equal(t.Hash) {
 		conn.Close()
 		return errors.New("hash mismatch")
 	}
-	p := peer.New(proxy, conn, ip, port, incoming, result)
+	p := peer.New(proxy, conn, addr, incoming, result)
 	if p == nil {
 		conn.Close()
 		return errors.New("couldn't create peer")
@@ -1502,10 +1498,10 @@ func (t *Torrent) NewPeer(proxy string, conn net.Conn, ip net.IP, port int, inco
 	}
 }
 
-func (t *Torrent) AddKnown(ip net.IP, port int, id hash.Hash, version string,
+func (t *Torrent) AddKnown(addr netip.AddrPort, id hash.Hash, version string,
 	kind known.Kind) error {
 	select {
-	case t.Event <- peer.TorAddKnown{nil, ip, port, id, version, kind}:
+	case t.Event <- peer.TorAddKnown{nil, addr, id, version, kind}:
 		return nil
 	case <-t.Done:
 		return ErrTorrentDead
@@ -1523,11 +1519,11 @@ func findIdlePeer(t *Torrent) *peer.Peer {
 				return p
 			}
 		}
-		port := p.GetPort()
-		if port <= 0 {
+		addr := p.GetAddr()
+		if addr.Port() <= 0 {
 			continue
 		}
-		kp := known.Find(t.known, p.IP, port, nil, "", known.None)
+		kp := known.Find(t.known, addr, nil, "", known.None)
 		if kp != nil {
 			tm := time.Since(kp.ActiveTime)
 			if tm > 5*time.Minute {
@@ -1658,10 +1654,10 @@ func (t *Torrent) GetPeers() ([]*peer.Peer, error) {
 	}
 }
 
-func (t *Torrent) GetKnown(id hash.Hash, ip net.IP, port int) (*known.Peer, error) {
+func (t *Torrent) GetKnown(id hash.Hash, addr netip.AddrPort) (*known.Peer, error) {
 	ch := make(chan known.Peer)
 	select {
-	case t.Event <- peer.TorGetKnown{id, ip, port, ch}:
+	case t.Event <- peer.TorGetKnown{id, addr, ch}:
 		select {
 		case v, ok := <-ch:
 			if !ok {
@@ -1872,7 +1868,7 @@ func trackerAnnounceSingle(ctx context.Context,
 		func(addr netip.AddrPort) bool {
 			select {
 			case t.Event <- peer.TorAddKnown{
-				nil, addr.Addr().AsSlice(), int(addr.Port()),
+				nil, addr,
 				nil, "", known.Tracker}:
 				return true
 			case <-t.Done:

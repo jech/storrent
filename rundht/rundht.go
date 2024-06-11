@@ -249,11 +249,7 @@ func Handle(dhtevent <-chan dht.Event) {
 		case dht.ValueEvent:
 			t := tor.Get(event.Hash)
 			if t != nil {
-				t.AddKnown(
-					event.Addr.Addr().AsSlice(),
-					int(event.Addr.Port()),
-					nil, "", known.DHT,
-				)
+				t.AddKnown(event.Addr, nil, "", known.DHT)
 			}
 		}
 	}

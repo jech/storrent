@@ -1,7 +1,7 @@
 package peer
 
 import (
-	"net"
+	"net/netip"
 	"time"
 
 	"github.com/jech/storrent/bitmap"
@@ -25,8 +25,7 @@ type TorPeerExtended struct {
 
 type TorAddKnown struct {
 	Peer    *Peer
-	IP      net.IP
-	Port    int
+	Addr    netip.AddrPort
 	Id      hash.Hash
 	Version string
 	Kind    known.Kind
@@ -69,8 +68,7 @@ type TorGetPeers struct {
 
 type TorGetKnown struct {
 	Id   hash.Hash
-	IP   net.IP
-	Port int
+	Addr netip.AddrPort
 	Ch   chan<- known.Peer
 }
 

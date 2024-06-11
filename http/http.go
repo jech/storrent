@@ -2,7 +2,6 @@ package http
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -618,25 +617,7 @@ func peers(w http.ResponseWriter, r *http.Request, t *tor.Torrent) {
 	}
 
 	slices.SortFunc(kps, func(a, b known.Peer) int {
-		v41 := a.Addr.IP.To4()
-		v42 := b.Addr.IP.To4()
-		var a1, a2 []byte
-		if v41 == nil && v42 != nil {
-			return -1
-		} else if v41 != nil && v42 == nil {
-			return 1
-		} else if v41 != nil && v42 != nil {
-			a1 = v41
-			a2 = v42
-		} else {
-			a1 = a.Addr.IP.To16()
-			a2 = b.Addr.IP.To16()
-		}
-		c := bytes.Compare(a1, a2)
-		if c != 0 {
-			return c
-		}
-		return cmp.Compare(a.Addr.Port, b.Addr.Port)
+		return a.Addr.Compare(b.Addr)
 	})
 	fmt.Fprintf(w, "<p><table>\n")
 	for _, k := range kps {
@@ -658,16 +639,16 @@ func peerVersion(id []byte, version string) string {
 }
 
 func hpeer(w http.ResponseWriter, p *peer.Peer, t *tor.Torrent) {
-	kp, _ := t.GetKnown(p.Id, p.IP, p.GetPort())
+	kp, _ := t.GetKnown(p.Id, p.GetAddr())
 	var addr string
-	if p.Port == 0 {
+	a := p.GetAddr()
+	if a.Port() == 0 {
 		if kp != nil {
 			addr = kp.Addr.String()
 		} else {
 			addr = p.IP.String()
 		}
 	} else {
-		a := net.TCPAddr{IP: p.IP, Port: p.GetPort()}
 		addr = a.String()
 	}
 	fmt.Fprintf(w, "<tr><td>%v</td>", addr)
