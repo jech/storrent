@@ -27,6 +27,15 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 		return ErrMartianAddress
 	}
 
+	ip := addr.IP.To4()
+	if ip == nil {
+		ip = addr.IP.To16()
+	}
+	if ip == nil {
+		conn.Close()
+		return errors.New("couldn't parse IP address")
+	}
+
 	conn, result, init, err :=
 		protocol.ServerHandshake(conn, infoHashes(false), cryptoOptions)
 	if err != nil {
@@ -70,7 +79,7 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 		return ErrDuplicateConnection
 	}
 
-	ipp, ok := netip.AddrFromSlice(addr.IP)
+	ipp, ok := netip.AddrFromSlice(ip)
 	if !ok {
 		conn.Close()
 		return errors.New("couldn't parse address")
