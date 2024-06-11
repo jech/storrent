@@ -514,7 +514,7 @@ func GetNodes() ([]netip.AddrPort, error) {
 		}
 	}
 	for i := 0; i < int(a6Count); i++ {
-		ip, ok := netip.AddrFromSlice(a[i*18:i*18+16])
+		ip, ok := netip.AddrFromSlice(a6[i*18:i*18+16])
 		if ok {
 			port := binary.BigEndian.Uint16(a6[i*18+16:])
 			addrs = append(addrs, netip.AddrPortFrom(ip, port))
