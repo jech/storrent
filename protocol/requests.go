@@ -2,7 +2,7 @@
 package protocol
 
 import (
-	"net"
+	"net/netip"
 
 	"github.com/zeebo/bencode"
 
@@ -120,8 +120,8 @@ type Extended0 struct {
 	Version      string
 	Port         uint16
 	ReqQ         uint32
-	IPv4         net.IP
-	IPv6         net.IP
+	IPv4         netip.Addr
+	IPv6         netip.Addr
 	MetadataSize uint32
 	Messages     map[string]uint8
 	UploadOnly   bool

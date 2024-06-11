@@ -250,7 +250,7 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 	if peer.canExtended {
 		var version string
 		var port uint16
-		var ipv6 net.IP
+		var ipv6 netip.Addr
 		if !hasProxy(peer) {
 			version = "STorrent 0.0"
 			port = uint16(config.ExternalPort(true,
@@ -1010,18 +1010,22 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			} else {
 				atomic.StoreUint32(&peer.Port, uint32(m.Port))
 			}
-			k := func(ip net.IP, kind known.Kind) {
+			k := func(ip netip.Addr, kind known.Kind) {
 				writeEvent(peer, TorAddKnown{peer,
-					ip, int(peer.Port), peer.Id,
+					ip.AsSlice(), int(peer.Port), peer.Id,
 					m.Version, kind,
 				})
 			}
-			k(peer.IP, known.ActiveNoReset)
-			k(peer.IP, known.Seen)
-			if m.IPv4 != nil {
+			ip, ok := netip.AddrFromSlice(peer.IP)
+			if ok {
+				k(ip, known.ActiveNoReset)
+				k(ip, known.Seen)
+			}
+			var zeroaddr netip.Addr
+			if m.IPv4 != zeroaddr {
 				k(m.IPv4, known.Heard)
 			}
-			if m.IPv6 != nil {
+			if m.IPv6 != zeroaddr {
 				k(m.IPv6, known.Heard)
 			}
 		}
@@ -1540,20 +1544,25 @@ func hasProxy(peer *Peer) bool {
 	return peer.proxy != ""
 }
 
-func getIPv6() net.IP {
+func getIPv6() netip.Addr {
+	var zeroaddr netip.Addr
 	conn, err := net.Dial("udp6", "[2400:cb00:2048:1::6814:155]:443")
 	if err != nil {
-		return nil
+		return zeroaddr
 	}
 	defer conn.Close()
 	addr, ok := conn.LocalAddr().(*net.UDPAddr)
 	if !ok {
-		return nil
+		return zeroaddr
 	}
 	if !addr.IP.IsGlobalUnicast() {
-		return nil
+		return zeroaddr
 	}
-	return addr.IP
+	ip, ok := netip.AddrFromSlice(addr.IP)
+	if !ok {
+		return zeroaddr
+	}
+	return ip
 }
 
 func (p *Peer) Encrypted() bool {

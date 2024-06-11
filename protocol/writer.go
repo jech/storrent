@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"log"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/zeebo/bencode"
@@ -159,11 +160,12 @@ func Write(w *bufio.Writer, m Message, l *log.Logger) error {
 		debugf("-> Extended0")
 		var f extensionInfo
 		f.Version = m.Version
-		if m.IPv6 != nil {
-			f.IPv6 = m.IPv6.To16()
+		zeroaddr := netip.Addr{}
+		if m.IPv6 != zeroaddr {
+			f.IPv6 = m.IPv6.AsSlice()
 		}
-		if m.IPv4 != nil {
-			f.IPv4 = m.IPv4.To4()
+		if m.IPv4 != zeroaddr {
+			f.IPv4 = m.IPv4.AsSlice()
 		}
 		f.Port = m.Port
 		f.ReqQ = m.ReqQ

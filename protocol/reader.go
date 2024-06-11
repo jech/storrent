@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -236,11 +237,13 @@ func Read(r *bufio.Reader, l *log.Logger) (Message, error) {
 			m.Version = ext.Version
 			m.Port = ext.Port
 			m.ReqQ = ext.ReqQ
-			if len(ext.IPv4) == 4 {
-				m.IPv4 = ext.IPv4
+			ip, ok := netip.AddrFromSlice(ext.IPv4)
+			if ok && ip.Is4() {
+				m.IPv4 = ip
 			}
-			if len(ext.IPv6) == 16 {
-				m.IPv6 = ext.IPv6
+			ip, ok = netip.AddrFromSlice(ext.IPv6)
+			if ok && ip.Is6() {
+				m.IPv6 = ip
 			}
 			m.MetadataSize = ext.MetadataSize
 			if len(ext.Messages) > 0 {
