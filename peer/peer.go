@@ -1019,11 +1019,10 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			}
 			k(peer.IP, known.ActiveNoReset)
 			k(peer.IP, known.Seen)
-			var zeroaddr netip.Addr
-			if m.IPv4 != zeroaddr {
+			if m.IPv4.IsValid() {
 				k(m.IPv4, known.Heard)
 			}
-			if m.IPv6 != zeroaddr {
+			if m.IPv6.IsValid() {
 				k(m.IPv6, known.Heard)
 			}
 		}
@@ -1541,22 +1540,21 @@ func hasProxy(peer *Peer) bool {
 }
 
 func getIPv6() netip.Addr {
-	var zeroaddr netip.Addr
 	conn, err := net.Dial("udp6", "[2400:cb00:2048:1::6814:155]:443")
 	if err != nil {
-		return zeroaddr
+		return netip.Addr{}
 	}
 	defer conn.Close()
 	addr, ok := conn.LocalAddr().(*net.UDPAddr)
 	if !ok {
-		return zeroaddr
+		return netip.Addr{}
 	}
 	if !addr.IP.IsGlobalUnicast() {
-		return zeroaddr
+		return netip.Addr{}
 	}
 	ip, ok := netip.AddrFromSlice(addr.IP)
 	if !ok {
-		return zeroaddr
+		return netip.Addr{}
 	}
 	return ip
 }
