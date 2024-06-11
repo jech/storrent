@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"net/netip"
 	"os"
 	"slices"
 	"sync/atomic"
@@ -411,7 +412,9 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 			if time.Since(peer.pexTorTime) >= 20*time.Minute {
 				for _, p := range peer.pex {
 					writeEvent(peer, TorAddKnown{peer,
-						p.IP, p.Port, nil, "", known.PEX,
+						p.Addr.Addr().AsSlice(),
+						int(p.Addr.Port()),
+						nil, "", known.PEX,
 					})
 				}
 				peer.pexTorTime = time.Now()
@@ -609,10 +612,14 @@ func handleEvent(peer *Peer, c PeerEvent) error {
 			if !peer.Incoming {
 				flags |= pex.Outgoing
 			}
-			c.Ch <- pex.Peer{
-				IP:    peer.IP,
-				Port:  int(peer.Port),
-				Flags: flags,
+			ip, ok := netip.AddrFromSlice(peer.IP)
+			if ok {
+				c.Ch <- pex.Peer{
+					Addr: netip.AddrPortFrom(
+						ip, uint16(peer.Port),
+					),
+					Flags: flags,
+				}
 			}
 		}
 		close(c.Ch)
@@ -930,7 +937,12 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 		peer.startStopUpload()
 	case protocol.Port:
 		if peer.IP != nil {
-			dht.Ping(peer.IP, m.Port)
+			ip, ok := netip.AddrFromSlice(peer.IP)
+			if ok {
+				dht.Ping(netip.AddrPortFrom(
+					ip, uint16(peer.Port),
+				))
+			}
 		}
 	case protocol.SuggestPiece:
 		if !peer.canFast {
@@ -1038,7 +1050,9 @@ func handleMessage(peer *Peer, m protocol.Message) error {
 			} else {
 				peer.pex = append(peer.pex, p)
 				writeEvent(peer, TorAddKnown{peer,
-					p.IP, p.Port, nil, "", known.PEX,
+					p.Addr.Addr().AsSlice(),
+					int(p.Addr.Port()),
+					nil, "", known.PEX,
 				})
 			}
 		}

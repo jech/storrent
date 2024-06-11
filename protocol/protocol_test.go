@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/netip"
 	"os"
 	"reflect"
 	"sync"
@@ -98,9 +99,9 @@ var messages = []mtest{
 		"d8:msg_typei1e5:piecei2e10:total_sizei65536ee" +
 		string(make([]byte, 10))},
 	mtest{ExtendedPex{ExtPex, []pex.Peer{
-		pex.Peer{IP: net.ParseIP("1.2.3.4").To4(), Port: 1234,
+		pex.Peer{Addr: netip.MustParseAddrPort("1.2.3.4:1234"),
 			Flags: pex.Encrypt | pex.Outgoing},
-		pex.Peer{IP: net.ParseIP("2001::1"), Port: 5678,
+		pex.Peer{Addr: netip.MustParseAddrPort("[2001::1]:5678"),
 			Flags: pex.UploadOnly}},
 		nil}, "\x00\x00\x00I\x14\x01" +
 		"d5:added6:\x01\x02\x03\x04\x04\xd2" +
@@ -110,10 +111,10 @@ var messages = []mtest{
 		"8:added6.f1:\x02e",
 	},
 	mtest{ExtendedPex{ExtPex, nil, []pex.Peer{
-		pex.Peer{IP: net.ParseIP("1.2.3.4").To4(), Port: 1234},
-		pex.Peer{IP: net.ParseIP("5.6.7.8").To4(), Port: 4321},
-		pex.Peer{IP: net.ParseIP("2001::1"), Port: 5678},
-		pex.Peer{IP: net.ParseIP("2001::2"), Port: 2345}}}, ""},
+		pex.Peer{Addr: netip.MustParseAddrPort("1.2.3.4:1234")},
+		pex.Peer{Addr: netip.MustParseAddrPort("5.6.7.8:4321")},
+		pex.Peer{Addr: netip.MustParseAddrPort("[2001::1]:5678")},
+		pex.Peer{Addr: netip.MustParseAddrPort("[2001::2]:2345")}}}, ""},
 	mtest{ExtendedDontHave{ExtDontHave, 1}, ""},
 }
 

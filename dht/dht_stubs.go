@@ -3,14 +3,14 @@
 package dht
 
 import (
-	"net"
+	"net/netip"
 )
 
 func Available() bool {
 	return false
 }
 
-func Ping(ip net.IP, port uint16) error {
+func Ping(netip.AddrPort) error {
 	return nil
 }
 

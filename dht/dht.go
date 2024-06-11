@@ -12,6 +12,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/netip"
 	"os"
 	"sync"
 	"time"
@@ -238,8 +239,7 @@ type Event interface {
 // A ValueEvent is returned by the DHT when values become available.
 type ValueEvent struct {
 	Hash []byte
-	IP   net.IP
-	Port uint16
+	Addr netip.AddrPort
 }
 
 var globalEvents chan Event
@@ -456,11 +456,9 @@ func Announce(id []byte, ipv6 bool, port uint16) error {
 }
 
 // Ping sends a ping message to a DHT node.
-func Ping(ip net.IP, port uint16) error {
-	ip4 := ip.To4()
-	if ip4 != nil {
-		ip = ip4
-	}
+func Ping(addr netip.AddrPort) error {
+	ip := addr.Addr().AsSlice()
+	port := addr.Port()
 	mu.Lock()
 	rc, err := C.ping_node((*C.uchar)(&ip[0]), C.int(len(ip)), C.int(port))
 	mu.Unlock()
@@ -489,7 +487,7 @@ func Count() (good4 int, good6 int,
 }
 
 // GetNodes returnes the set of known good nodes.
-func GetNodes() ([]net.TCPAddr, error) {
+func GetNodes() ([]netip.AddrPort, error) {
 	var aptr, a6ptr *C.uchar
 	var aCount, a6Count C.int
 	mu.Lock()
@@ -507,18 +505,20 @@ func GetNodes() ([]net.TCPAddr, error) {
 	a := unsafe.Slice((*byte)(aptr), aCount*6)
 	a6 := unsafe.Slice((*byte)(a6ptr), a6Count*18)
 
-	var addrs []net.TCPAddr
+	var addrs []netip.AddrPort
 	for i := 0; i < int(aCount); i++ {
-		ip := make([]byte, 4)
-		copy(ip, a[i*6:])
-		port := binary.BigEndian.Uint16(a[i*6+4:])
-		addrs = append(addrs, net.TCPAddr{IP: ip, Port: int(port)})
+		ip, ok := netip.AddrFromSlice(a[i*6:i*6+4])
+		if ok {
+			port := binary.BigEndian.Uint16(a[i*6+4:])
+			addrs = append(addrs, netip.AddrPortFrom(ip, port))
+		}
 	}
 	for i := 0; i < int(a6Count); i++ {
-		ip := make([]byte, 16)
-		copy(ip, a6[i*18:])
-		port := binary.BigEndian.Uint16(a6[i*18+16:])
-		addrs = append(addrs, net.TCPAddr{IP: ip, Port: int(port)})
+		ip, ok := netip.AddrFromSlice(a[i*18:i*18+16])
+		if ok {
+			port := binary.BigEndian.Uint16(a6[i*18+16:])
+			addrs = append(addrs, netip.AddrPortFrom(ip, port))
+		}
 	}
 	return addrs, nil
 }

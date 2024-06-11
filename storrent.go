@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -232,7 +233,7 @@ func main() {
 		close(portmapdone)
 	}
 
-	var dhtaddrs []net.TCPAddr
+	var dhtaddrs []netip.AddrPort
 	var id []byte
 	if config.DHTBootstrap != "" {
 		id, dhtaddrs, err = rundht.Read(config.DHTBootstrap)

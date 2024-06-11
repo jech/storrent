@@ -3,14 +3,13 @@ package pex
 
 import (
 	"encoding/binary"
-	"net"
+	"net/netip"
 	"slices"
 )
 
 // Peer represents a peer known or announced over PEX.
 type Peer struct {
-	IP    net.IP
-	Port  int
+	Addr  netip.AddrPort
 	Flags byte
 }
 
@@ -21,15 +20,10 @@ const (
 	Outgoing   = 0x10
 )
 
-// Equal returns true if two peers have the same socket address.
-func (p Peer) Equal(q Peer) bool {
-	return p.IP.Equal(q.IP) && p.Port == q.Port
-}
-
 // Find find a peer in a list of peers.
 func Find(p Peer, l []Peer) int {
 	return slices.IndexFunc(l, func(q Peer) bool {
-		return p.Equal(q)
+		return p.Addr == q.Addr
 	})
 }
 
@@ -48,15 +42,17 @@ func ParseCompact(data []byte, flags []byte, ipv6 bool) []Peer {
 	var peers = make([]Peer, 0, n)
 	for i := 0; i < n; i++ {
 		j := i * (l + 2)
-		ip := net.IP(make([]byte, l))
-		copy(ip, data[j:j+l])
+		ip, ok := netip.AddrFromSlice(data[j : j+l])
+		if !ok {
+			continue
+		}
 		var flag byte
 		if i < len(flags) {
 			flag = flags[i]
 		}
 		port := binary.BigEndian.Uint16(data[j+l:])
-		peers = append(peers,
-			Peer{IP: ip, Port: int(port), Flags: flag})
+		addr := netip.AddrPortFrom(ip, port)
+		peers = append(peers, Peer{Addr: addr, Flags: flag})
 	}
 	return peers
 }
@@ -64,16 +60,19 @@ func ParseCompact(data []byte, flags []byte, ipv6 bool) []Peer {
 // FormatCompact formats a list of PEX peers in compact format.
 func FormatCompact(peers []Peer) (ipv4 []byte, flags4 []byte, ipv6 []byte, flags6 []byte) {
 	for _, peer := range peers {
-		v4 := peer.IP.To4()
-		v6 := peer.IP.To16()
-		port := uint16(peer.Port)
-		if v4 != nil {
-			ipv4 = append(ipv4, []byte(v4)...)
-			ipv4 = binary.BigEndian.AppendUint16(ipv4, port)
+		if peer.Addr.Addr().Is4() {
+			v4 := peer.Addr.Addr().As4()
+			ipv4 = append(ipv4, v4[:]...)
+			ipv4 = binary.BigEndian.AppendUint16(
+				ipv4, peer.Addr.Port(),
+			)
 			flags4 = append(flags4, peer.Flags)
-		} else if v6 != nil {
-			ipv6 = append(ipv6, []byte(v6)...)
-			ipv6 = binary.BigEndian.AppendUint16(ipv6, port)
+		} else {
+			v6 := peer.Addr.Addr().As16()
+			ipv6 = append(ipv6, v6[:]...)
+			ipv6 = binary.BigEndian.AppendUint16(
+				ipv6, peer.Addr.Port(),
+			)
 			flags6 = append(flags6, peer.Flags)
 		}
 	}

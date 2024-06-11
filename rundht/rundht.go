@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 // Package rundht implements the interface between storrent and the DHT.
@@ -10,6 +11,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"time"
@@ -47,21 +49,19 @@ type BDHT struct {
 	Nodes6 []byte `bencode:"nodes6,omitempty"`
 }
 
-func parseCompact(data []byte, ipv6 bool) []net.TCPAddr {
+func parseCompact(data []byte, ipv6 bool) []netip.AddrPort {
 	peers := pex.ParseCompact(data, nil, ipv6)
-	addrs := make([]net.TCPAddr, len(peers))
+	addrs := make([]netip.AddrPort, len(peers))
 	for i, p := range peers {
-		addrs[i].IP = p.IP
-		addrs[i].Port = p.Port
+		addrs[i] = p.Addr
 	}
 	return addrs
 }
 
-func formatCompact(addrs []net.TCPAddr) ([]byte, []byte) {
+func formatCompact(addrs []netip.AddrPort) ([]byte, []byte) {
 	peers := make([]pex.Peer, len(addrs))
 	for i, a := range addrs {
-		peers[i].IP = a.IP
-		peers[i].Port = a.Port
+		peers[i].Addr = a
 	}
 	n4, _, n6, _ := pex.FormatCompact(peers)
 	return n4, n6
@@ -86,7 +86,7 @@ func read(filename string) (bdht *BDHT, info os.FileInfo, err error) {
 }
 
 // Read reads the dht.dat file and returns a set of potential nodes.
-func Read(filename string) (id []byte, nodes []net.TCPAddr, err error) {
+func Read(filename string) (id []byte, nodes []netip.AddrPort, err error) {
 	bdht, info, err := read(filename)
 
 	if err != nil {
@@ -140,7 +140,7 @@ func Write(filename string, id []byte) error {
 }
 
 // Bootstrap bootstraps the DHT.
-func Bootstrap(ctx context.Context, nodes []net.TCPAddr) {
+func Bootstrap(ctx context.Context, nodes []netip.AddrPort) {
 	bootstrap := []string{"dht.transmissionbt.com", "router.bittorrent.com"}
 
 	reannounced4 := false
@@ -184,8 +184,7 @@ func Bootstrap(ctx context.Context, nodes []net.TCPAddr) {
 		if reannounced4 && reannounced6 && i >= len(nodes) {
 			return
 		}
-		n := nodes[ni[i%len(nodes)]]
-		dht.Ping(n.IP, uint16(n.Port))
+		dht.Ping(nodes[ni[i%len(nodes)]])
 		if i < 16 && i < len(nodes) {
 			doze()
 		} else {
@@ -206,7 +205,12 @@ func Bootstrap(ctx context.Context, nodes []net.TCPAddr) {
 			continue
 		}
 		for _, ip := range ips {
-			nodes = append(nodes, net.TCPAddr{IP: ip, Port: 6881})
+			ipp, ok := netip.AddrFromSlice(ip)
+			if ok {
+				nodes = append(nodes,
+					netip.AddrPortFrom(ipp, 6881),
+				)
+			}
 		}
 	}
 
@@ -224,8 +228,7 @@ func Bootstrap(ctx context.Context, nodes []net.TCPAddr) {
 			return
 		}
 
-		n := nodes[i%len(nodes)]
-		dht.Ping(n.IP, uint16(n.Port))
+		dht.Ping(nodes[i%len(nodes)])
 		nap(2, 1)
 		if ctx.Err() != nil {
 			return
@@ -246,8 +249,11 @@ func Handle(dhtevent <-chan dht.Event) {
 		case dht.ValueEvent:
 			t := tor.Get(event.Hash)
 			if t != nil {
-				t.AddKnown(event.IP, int(event.Port),
-					nil, "", known.DHT)
+				t.AddKnown(
+					event.Addr.Addr().AsSlice(),
+					int(event.Addr.Port()),
+					nil, "", known.DHT,
+				)
 			}
 		}
 	}

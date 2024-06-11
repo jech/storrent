@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"net/netip"
 	"os"
 	"slices"
 	"sync/atomic"
@@ -547,11 +548,13 @@ func delPeer(t *Torrent, p *peer.Peer) bool {
 	// at this point, the dying peer won't reply to a GetPex request
 	port := p.GetPort()
 	if port > 0 {
-		pp := []pex.Peer{{
-			IP:   p.IP,
-			Port: port,
-		}}
-		writePeers(t, peer.PeerPex{pp, false}, nil)
+		ip, ok := netip.AddrFromSlice(p.IP)
+		if ok {
+			pp := []pex.Peer{{
+				Addr: netip.AddrPortFrom(ip, uint16(port)),
+			}}
+			writePeers(t, peer.PeerPex{pp, false}, nil)
+		}
 	}
 	return i >= 0
 }

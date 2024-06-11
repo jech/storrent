@@ -4,10 +4,10 @@ package rundht
 
 import (
 	"context"
-	"net"
+	"net/netip"
 )
 
-func Read(filename string) ([]byte, []net.TCPAddr, error) {
+func Read(filename string) ([]byte, []netip.AddrPort, error) {
 	return nil, nil, nil
 }
 
@@ -19,7 +19,7 @@ func Handle(dhtevent <-chan struct{}) {
 	return
 }
 
-func Bootstrap(ctx context.Context, nodes []net.TCPAddr) {
+func Bootstrap(ctx context.Context, nodes []netip.AddrPort) {
 	return
 }
 
