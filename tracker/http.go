@@ -3,8 +3,8 @@ package tracker
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
+	"net/netip"
 	nurl "net/url"
 	"strconv"
 	"sync"
@@ -32,13 +32,13 @@ type httpReply struct {
 // peer is a peer returned by a tracker.
 type peer struct {
 	IP   string `bencode:"ip"`
-	Port int    `bencode:"port"`
+	Port uint16 `bencode:"port"`
 }
 
 // Announce performs an HTTP announce over both IPv4 and IPv6 in parallel.
 func (tracker *HTTP) Announce(ctx context.Context, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
-	f func(net.IP, int) bool) error {
+	f func(netip.AddrPort) bool) error {
 
 	ok := tracker.tryLock()
 	if !ok {
@@ -99,7 +99,7 @@ func (tracker *HTTP) Announce(ctx context.Context, hash []byte, myid []byte,
 // announceHTTP performs a single HTTP announce
 func announceHTTP(ctx context.Context, protocol string, tracker *HTTP,
 	hash []byte, myid []byte, want int, size int64, port int, proxy string,
-	f func(net.IP, int) bool) (int, error) {
+	f func(netip.AddrPort) bool) (int, error) {
 	url, err := nurl.Parse(tracker.url)
 	if err != nil {
 		return 0, err
@@ -169,10 +169,12 @@ func announceHTTP(ctx context.Context, protocol string, tracker *HTTP,
 	if err == nil && len(peers)%6 == 0 {
 		// compact format
 		for i := 0; i < len(peers); i += 6 {
-			ip := net.IP(make([]byte, 4))
-			copy(ip, peers[i:i+4])
-			port := 256*int(peers[i+4]) + int(peers[i+5])
-			f(ip, port)
+			ip, ok := netip.AddrFromSlice(peers[i : i+4])
+			if ok {
+				port := 256*uint16(peers[i+4]) +
+					uint16(peers[i+5])
+				f(netip.AddrPortFrom(ip, port))
+			}
 		}
 	} else {
 		// original format
@@ -180,9 +182,9 @@ func announceHTTP(ctx context.Context, protocol string, tracker *HTTP,
 		err = bencode.DecodeBytes(reply.Peers, &peers)
 		if err == nil {
 			for _, p := range peers {
-				ip := net.ParseIP(p.IP)
-				if ip != nil {
-					f(ip, p.Port)
+				ip, err := netip.ParseAddr(p.IP)
+				if err == nil {
+					f(netip.AddrPortFrom(ip, p.Port))
 				}
 			}
 		}
@@ -191,11 +193,12 @@ func announceHTTP(ctx context.Context, protocol string, tracker *HTTP,
 	if len(reply.Peers6)%18 == 0 {
 		// peers6 is always in compact format
 		for i := 0; i < len(reply.Peers6); i += 18 {
-			ip := net.IP(make([]byte, 16))
-			copy(ip, reply.Peers6[i:i+16])
-			port := 256*int(reply.Peers6[i+16]) +
-				int(reply.Peers6[i+17])
-			f(ip, port)
+			ip, ok := netip.AddrFromSlice(reply.Peers6[i : i+16])
+			if ok {
+				port := 256*uint16(reply.Peers6[i+16]) +
+					uint16(reply.Peers6[i+17])
+				f(netip.AddrPortFrom(ip, port))
+			}
 		}
 	}
 	return reply.Interval, nil

@@ -1869,10 +1869,11 @@ func trackerAnnounceSingle(ctx context.Context,
 	}
 	err := tr.Announce(ctx, t.Hash, t.MyId,
 		want, length, port4, port6, t.proxy,
-		func(ip net.IP, port int) bool {
+		func(addr netip.AddrPort) bool {
 			select {
 			case t.Event <- peer.TorAddKnown{
-				nil, ip, port, nil, "", known.Tracker}:
+				nil, addr.Addr().AsSlice(), int(addr.Port()),
+				nil, "", known.Tracker}:
 				return true
 			case <-t.Done:
 				return false

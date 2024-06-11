@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	nurl "net/url"
 	"sync/atomic"
 	"time"
@@ -36,7 +36,7 @@ type Tracker interface {
 	// Announce performs parallel announces over both IPv4 and IPv6.
 	Announce(ctx context.Context, hash []byte, myid []byte,
 		want int, size int64, port4, port6 int, proxy string,
-		f func(net.IP, int) bool) error
+		f func(netip.AddrPort) bool) error
 }
 
 // New creates a new tracker from a URL.
@@ -139,7 +139,7 @@ func (tracker *base) updateInterval(interval time.Duration, err error) {
 // Announce performs parallel announces over both IPv4 and IPv6.
 func (tracker *base) Announce(ctx context.Context, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
-	f func(net.IP, int) bool) error {
+	f func(netip.AddrPort) bool) error {
 	return errors.New("not implemented")
 }
 

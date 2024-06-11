@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"net/netip"
 	nurl "net/url"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ type UDP struct {
 // Announce performs a UDP announce over IPv4 and Ipv6 in parallel.
 func (tracker *UDP) Announce(ctx context.Context, hash []byte, myid []byte,
 	want int, size int64, port4, port6 int, proxy string,
-	f func(net.IP, int) bool) error {
+	f func(netip.AddrPort) bool) error {
 	ok := tracker.tryLock()
 	if !ok {
 		return ErrNotReady
@@ -70,7 +71,7 @@ func (tracker *UDP) Announce(ctx context.Context, hash []byte, myid []byte,
 }
 
 func announceUDP(ctx context.Context, prot string,
-	f func(ip net.IP, port int) bool, url *nurl.URL, hash, myid []byte,
+	f func(addr netip.AddrPort) bool, url *nurl.URL, hash, myid []byte,
 	want int, size int64, port int, prox string) (time.Duration, error) {
 
 	var conn net.Conn
@@ -215,17 +216,16 @@ func announceUDP(ctx context.Context, prot string,
 		panic("Eek")
 	}
 	buf := make([]byte, len+2)
-	i := 0
 	for {
 		_, err = io.ReadFull(r, buf)
 		if err != nil {
 			break
 		}
-		ip := net.IP(make([]byte, len))
-		copy(ip, buf)
-		port := 256*int(buf[len]) + int(buf[len+1])
-		f(ip, port)
-		i++
+		ip, ok := netip.AddrFromSlice(buf[:len])
+		if ok {
+			port := 256*uint16(buf[len]) + uint16(buf[len+1])
+			f(netip.AddrPortFrom(ip, port))
+		}
 	}
 
 	if err == io.EOF {
