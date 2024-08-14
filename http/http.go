@@ -116,13 +116,30 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 				http.StatusMethodNotAllowed)
 			return
 		}
-		data := strings.TrimSpace(r.FormValue("url"))
-		if data == "" {
-			http.Error(w, "No torrent supplied",
-				http.StatusBadRequest)
+		err := r.ParseMultipartForm(1024 * 1024)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		t, err := fetchTorrent(r.Context(), data)
+		u := strings.TrimSpace(r.FormValue("url"))
+		f, _, err := r.FormFile("file")
+		if err != nil && err != http.ErrMissingFile {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		var t *tor.Torrent
+		if err == nil {
+			defer f.Close()
+			if u != "" {
+				http.Error(w, "both magnet and file provided",
+					http.StatusBadRequest)
+				return
+			}
+			t, err = tor.ReadTorrent(config.DefaultProxy(), f)
+
+		} else {
+			t, err = fetchTorrent(r.Context(), u)
+		}
 		if t == nil || err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -563,7 +580,7 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "<form action=\"/?q=add\" method=\"post\">Magnet or URL: <input type=\"text\" name=\"url\"/> <input type=\"submit\"/></form> ")
+	fmt.Fprintf(w, "<form action=\"/?q=add\" method=\"post\" enctype=\"multipart/form-data\">Magnet or URL: <input type=\"text\" name=\"url\"/><input type=\"file\" name=\"file\"><input type=\"submit\"/></form> ")
 	fmt.Fprintf(w, "<form action=\"/?q=set\" method=\"post\">Idle download: <input type=\"text\" name=\"idle\"/> Upload: <input type=\"text\" name=\"upload\"/> <input type=\"submit\"/></form>\n")
 
 	fmt.Fprintf(w, "<p>Download %v / %v, upload %v / %v (unchoking %v), ",
