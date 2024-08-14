@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -116,19 +117,26 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 				http.StatusMethodNotAllowed)
 			return
 		}
-		err := r.ParseMultipartForm(1024 * 1024)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		u := strings.TrimSpace(r.FormValue("url"))
-		f, _, err := r.FormFile("file")
-		if err != nil && err != http.ErrMissingFile {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		m, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		var u string
+		var f io.ReadCloser
+		if m == "multipart/form-data" {
+			err := r.ParseMultipartForm(1024 * 1024)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			u = strings.TrimSpace(r.FormValue("url"))
+			f, _, err = r.FormFile("file")
+			if err != nil && err != http.ErrMissingFile {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		} else {
+			u = strings.TrimSpace(r.Form.Get("url"))
 		}
 		var t *tor.Torrent
-		if err == nil {
+		if f != nil {
 			defer f.Close()
 			if u != "" {
 				http.Error(w, "both magnet and file provided",
@@ -138,6 +146,11 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 			t, err = tor.ReadTorrent(config.DefaultProxy(), f)
 
 		} else {
+			if u == "" {
+				http.Error(w, "neither URL nor file provided",
+					http.StatusBadRequest)
+				return
+			}
 			t, err = fetchTorrent(r.Context(), u)
 		}
 		if t == nil || err != nil {
