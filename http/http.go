@@ -28,7 +28,10 @@ import (
 )
 
 func Serve(addr string) error {
-	http.Handle("/", NewHandler())
+	http.HandleFunc("/{$}", rootHandler)
+	http.HandleFunc("/{file}", torRootHandler)
+	http.HandleFunc("/{hash}/{path...}", torHandler)
+
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -43,18 +46,11 @@ func Serve(addr string) error {
 	return nil
 }
 
-type handler struct {
-}
-
-func NewHandler() http.Handler {
-	return &handler{}
-}
-
-func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func checkLocal(w http.ResponseWriter, r *http.Request) bool {
 	host, _, err := net.SplitHostPort(r.Host)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return false
 	}
 
 	// The server is only bound to localhost, but an attacker might be
@@ -63,84 +59,17 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// browser thinks it's connecting to localhost.
 	if host != "localhost" && net.ParseIP(host) == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
+		return false
 	}
 
-	pth := r.URL.Path
-	if pth == "/" {
-		root(w, r)
-		return
-	}
-
-	if len(pth) < 41 {
-		http.NotFound(w, r)
-		return
-	}
-
-	hash := hash.Parse(pth[1:41])
-	if hash == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	if r.Method != "HEAD" && r.Method != "GET" {
-		w.Header().Set("allow", "HEAD, GET")
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if len(pth) == 41 {
-		t := tor.Get(hash)
-		if t == nil {
-			http.NotFound(w, r)
-			return
-		}
-		http.Redirect(w, r, pth+"/", http.StatusMovedPermanently)
-		return
-	}
-
-	if pth[41] == '/' {
-		err = r.ParseForm()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if r.Form["playlist"] != nil {
-			playlist(w, r, hash, path.Parse(pth[42:]))
-			return
-		}
-		if pth[len(pth)-1] == '/' {
-			directory(w, r, hash, path.Parse(pth[42:]))
-			return
-		} else {
-			file(w, r, hash, path.Parse(pth[42:]))
-			return
-		}
-	}
-
-	if pth[41] == '.' {
-		extension := pth[42:]
-		if extension == "torrent" {
-			torfile(w, r)
-			return
-		} else if extension == "m3u" {
-			playlist(w, r, hash, nil)
-			return
-		}
-	}
-
-	http.NotFound(w, r)
+	return true
 }
 
-func getTorrent(ctx context.Context, data string) (*tor.Torrent, error) {
-	t, err := tor.ReadMagnet(config.DefaultProxy(), data)
-	if t != nil || err != nil {
-		return t, err
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkLocal(w, r) {
+		return
 	}
-	return tor.GetTorrent(ctx, config.DefaultProxy(), data)
-}
 
-func root(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "HEAD" && r.Method != "GET" && r.Method != "POST" {
 		w.Header().Set("allow", "HEAD, GET, POST")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -182,12 +111,18 @@ func root(w http.ResponseWriter, r *http.Request) {
 		peers(w, r, torrent)
 		return
 	} else if q == "add" {
-		data := strings.TrimSpace(r.FormValue("url"))
-		if data == "" {
-			http.Error(w, "No torrent supplied", http.StatusBadRequest)
+		if r.Method != "GET" && r.Method != "POST" {
+			http.Error(w, "Method not allowed",
+				http.StatusMethodNotAllowed)
 			return
 		}
-		t, err := getTorrent(r.Context(), data)
+		data := strings.TrimSpace(r.FormValue("url"))
+		if data == "" {
+			http.Error(w, "No torrent supplied",
+				http.StatusBadRequest)
+			return
+		}
+		t, err := fetchTorrent(r.Context(), data)
 		if t == nil || err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -201,9 +136,15 @@ func root(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	} else if q == "delete" {
+		if r.Method != "GET" && r.Method != "POST" {
+			http.Error(w, "Method not allowed",
+				http.StatusMethodNotAllowed)
+			return
+		}
 		h := hash.Parse(r.FormValue("hash"))
 		if h == nil {
-			http.Error(w, "couldn't parse hash", http.StatusBadRequest)
+			http.Error(w, "couldn't parse hash",
+				http.StatusBadRequest)
 			return
 		}
 		t := tor.Get(h)
@@ -224,6 +165,11 @@ func root(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	} else if q == "set" {
+		if r.Method != "GET" && r.Method != "POST" {
+			http.Error(w, "Method not allowed",
+				http.StatusMethodNotAllowed)
+			return
+		}
 		upload := r.Form.Get("upload")
 		if upload != "" {
 			v, err := strconv.ParseFloat(upload, 64)
@@ -245,6 +191,11 @@ func root(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	} else if q == "set-torrent" {
+		if r.Method != "GET" && r.Method != "POST" {
+			http.Error(w, "Method not allowed",
+				http.StatusMethodNotAllowed)
+			return
+		}
 		h := hash.Parse(r.FormValue("hash"))
 		if h == nil {
 			http.Error(w, "couldn't parse hash", http.StatusBadRequest)
@@ -280,6 +231,107 @@ func root(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func torRootHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkLocal(w, r) {
+		return
+	}
+
+	file := r.PathValue("file")
+	base, ext, ok := strings.Cut(file, ".")
+	if !ok {
+		hash := hash.Parse(base)
+		if hash == nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		t := tor.Get(hash)
+		if t == nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		http.Redirect(w, r, r.URL.Path+"/",
+			http.StatusMovedPermanently)
+		return
+	}
+
+	hash := hash.Parse(base)
+	if hash == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	t := tor.Get(hash)
+	if t == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	switch ext {
+	case "torrent":
+		torfile(w, r, t)
+		return
+	case "m3u":
+		playlist(w, r, t, nil)
+		return
+	default:
+		http.NotFound(w, r)
+		return
+	}
+}
+
+func torHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkLocal(w, r) {
+		return
+	}
+
+	h := r.PathValue("hash")
+	pth := "/" + r.PathValue("path")
+
+	hash := hash.Parse(h)
+	if hash == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	t := tor.Get(hash)
+	if t == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if r.Method != "HEAD" && r.Method != "GET" {
+		w.Header().Set("allow", "HEAD, GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if r.Form["playlist"] != nil {
+		playlist(w, r, t, path.Parse(pth))
+		return
+	}
+	if pth[len(pth)-1] == '/' {
+		directory(w, r, t, path.Parse(pth))
+		return
+	}
+	file(w, r, t, path.Parse(pth))
+	return
+}
+
+func fetchTorrent(ctx context.Context, data string) (*tor.Torrent, error) {
+	t, err := tor.ReadMagnet(config.DefaultProxy(), data)
+	if t != nil || err != nil {
+		return t, err
+	}
+	return tor.GetTorrent(ctx, config.DefaultProxy(), data)
+}
+
 func header(w http.ResponseWriter, r *http.Request, title string) bool {
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	w.Header().Set("cache-control", "no-cache")
@@ -302,15 +354,9 @@ func footer(w http.ResponseWriter) {
 	fmt.Fprintf(w, "</body></html>\n")
 }
 
-func directory(w http.ResponseWriter, r *http.Request, hash hash.Hash, pth path.Path) {
+func directory(w http.ResponseWriter, r *http.Request, t *tor.Torrent, pth path.Path) {
 
 	ctx := r.Context()
-
-	t := tor.Get(hash)
-	if t == nil {
-		http.NotFound(w, r)
-		return
-	}
 
 	done := header(w, r, t.Name)
 	if done {
@@ -812,25 +858,7 @@ func hknown(w http.ResponseWriter, kp *known.Peer, t *tor.Torrent) {
 	)
 }
 
-func torfile(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	if path[0] != '/' || len(path) <= 41 {
-		http.NotFound(w, r)
-		return
-	}
-
-	hash := hash.Parse(path[1:41])
-	if hash == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	t := tor.Get(hash)
-	if t == nil {
-		http.NotFound(w, r)
-		return
-	}
-
+func torfile(w http.ResponseWriter, r *http.Request, t *tor.Torrent) {
 	if !t.InfoComplete() {
 		http.Error(w, "torrent metadata incomplete",
 			http.StatusGatewayTimeout)
@@ -861,14 +889,7 @@ func m3uentry(w http.ResponseWriter, host string, hash hash.Hash, path path.Path
 		host, hash, pathUrl(path))
 }
 
-func playlist(w http.ResponseWriter, r *http.Request, hash hash.Hash, dir path.Path) {
-
-	t := tor.Get(hash)
-	if t == nil {
-		http.NotFound(w, r)
-		return
-	}
-
+func playlist(w http.ResponseWriter, r *http.Request, t *tor.Torrent, dir path.Path) {
 	if !t.InfoComplete() {
 		http.Error(w, "torrent metadata incomplete",
 			http.StatusGatewayTimeout)
@@ -906,7 +927,7 @@ func playlist(w http.ResponseWriter, r *http.Request, hash hash.Hash, dir path.P
 
 	fmt.Fprintf(w, "#EXTM3U\n")
 	if t.Files == nil {
-		m3uentry(w, r.Host, hash, path.Parse(t.Name))
+		m3uentry(w, r.Host, t.Hash, path.Parse(t.Name))
 	} else {
 		a := make([]int, len(t.Files))
 		for i := range a {
@@ -918,26 +939,20 @@ func playlist(w http.ResponseWriter, r *http.Request, hash hash.Hash, dir path.P
 		for _, i := range a {
 			path := t.Files[i].Path
 			if path.Within(dir) {
-				m3uentry(w, r.Host, hash, path)
+				m3uentry(w, r.Host, t.Hash, path)
 			}
 		}
 	}
 }
 
-func file(w http.ResponseWriter, r *http.Request, hash hash.Hash, path path.Path) {
-	t := tor.Get(hash)
-	if t == nil {
-		http.NotFound(w, r)
-		return
-	}
-
+func file(w http.ResponseWriter, r *http.Request, t *tor.Torrent, path path.Path) {
 	if !t.InfoComplete() {
 		http.Error(w, "torrent metadata incomplete",
 			http.StatusGatewayTimeout)
 		return
 	}
 
-	offset, length, etag, err := fileParms(t, hash, path)
+	offset, length, etag, err := fileParms(t, path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.NotFound(w, r)
@@ -958,7 +973,7 @@ func file(w http.ResponseWriter, r *http.Request, hash hash.Hash, path path.Path
 	http.ServeContent(w, r, path.String(), ctime, reader)
 }
 
-func fileParms(t *tor.Torrent, hash hash.Hash, pth path.Path) (offset int64, length int64, etag string, err error) {
+func fileParms(t *tor.Torrent, pth path.Path) (offset int64, length int64, etag string, err error) {
 	var file *tor.Torfile
 
 	if t.Files == nil {
@@ -983,6 +998,6 @@ func fileParms(t *tor.Torrent, hash hash.Hash, pth path.Path) (offset int64, len
 		offset = file.Offset
 		length = file.Length
 	}
-	etag = fmt.Sprintf("\"%v-%v\"", hash.String(), offset)
+	etag = fmt.Sprintf("\"%v-%v\"", t.Hash.String(), offset)
 	return
 }
