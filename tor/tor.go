@@ -9,7 +9,7 @@ import (
 	"io"
 	"log"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/netip"
 	"os"
@@ -169,9 +169,9 @@ func (t *Torrent) run(ctx context.Context) {
 		t.Pieces.Del()
 	}()
 
-	t.rand = rand.New(rand.NewSource(rand.Int63()))
+	t.rand = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
 	jiffy := func() time.Duration {
-		return time.Duration(t.rand.Int63n(int64(time.Second)))
+		return rand.N(time.Second)
 	}
 	ticker := time.NewTicker(5*time.Second + jiffy())
 	slowTicker := time.NewTicker(20*time.Second + jiffy())
@@ -303,7 +303,7 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 					kp := known.Find(t.known,
 						addr, nil, "", bad)
 					if kp != nil && kp.Bad() &&
-						t.rand.Intn(5) == 0 {
+						t.rand.IntN(5) == 0 {
 						writePeer(p, peer.PeerDone{})
 					}
 				} else if c.Bad {
@@ -1012,7 +1012,7 @@ func maybeWebseed(ctx context.Context, t *Torrent, index uint32, idle bool) bool
 		if wsi.Count() != wsj.Count() {
 			return cmp.Compare(wsi.Count(), wsj.Count())
 		}
-		if t.rand.Intn(10) == 0 {
+		if t.rand.IntN(10) == 0 {
 			return 1
 		}
 		return cmp.Compare(wsj.Rate(), wsi.Rate())
@@ -1328,8 +1328,7 @@ func maybeConnect(ctx context.Context, t *Torrent) {
 		}
 		kp.Update("", known.ConnectAttempt)
 		go func(kp *known.Peer) {
-			delay := time.Duration(
-				rand.Int63n(int64(3 * time.Second)))
+			delay := rand.N(3 * time.Second)
 			timer := time.NewTimer(delay)
 			select {
 			case <-ctx.Done():
@@ -1398,7 +1397,7 @@ func maybeUnchoke(t *Torrent, periodic bool) {
 		return
 	}
 
-	opportunistic := t.rand.Intn(5) == 0
+	opportunistic := t.rand.IntN(5) == 0
 	slices.SortFunc(interested, func(a, b *peer.Peer) int {
 		s1 := a.GetStatus()
 		s2 := b.GetStatus()

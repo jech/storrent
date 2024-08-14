@@ -1,7 +1,7 @@
 package bitmap
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"testing"
 )
 
@@ -39,8 +39,8 @@ func TestBitmap(t *testing.T) {
 			t.Errorf("Count failed")
 		}
 		for i := 0; i < 500; i++ {
-			index := rand.Intn(1000)
-			if rand.Intn(3) == 0 {
+			index := rand.IntN(1000)
+			if rand.IntN(3) == 0 {
 				a[index] = true
 				b.Set(index)
 				if b.Empty() {
@@ -223,7 +223,7 @@ func BenchmarkGet(b *testing.B) {
 	var bm Bitmap
 
 	for i := 0; i < size/10; i++ {
-		bm.Set(rand.Intn(size))
+		bm.Set(rand.IntN(size))
 	}
 
 	b.ResetTimer()
@@ -245,7 +245,7 @@ func BenchmarkArraySparseCount(b *testing.B) {
 	a := make([]bool, size)
 
 	for i := 0; i < size/10; i++ {
-		a[rand.Intn(size)] = true
+		a[rand.IntN(size)] = true
 	}
 
 	b.ResetTimer()
@@ -261,7 +261,7 @@ func BenchmarkSparseCount(b *testing.B) {
 	var bm Bitmap
 
 	for i := 0; i < size/10; i++ {
-		bm.Set(rand.Intn(size))
+		bm.Set(rand.IntN(size))
 	}
 
 	b.ResetTimer()

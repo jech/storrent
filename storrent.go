@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/netip"
@@ -47,8 +47,6 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stderr, "STorrent 0.0 by Juliusz Chroboczek\n")
-
-	rand.Seed(time.Now().UTC().UnixNano())
 
 	flag.IntVar(&config.ProtocolPort, "port", 23222,
 		"TCP and UDP `port` used for BitTorrent and DHT traffic")
@@ -400,6 +398,6 @@ func roughly(d time.Duration) time.Duration {
 	if r > 2*time.Second {
 		r = 2 * time.Second
 	}
-	m := time.Duration(rand.Int63n(int64(r)))
+	m := rand.N(r)
 	return d + m - r/2
 }

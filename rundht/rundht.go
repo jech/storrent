@@ -9,7 +9,7 @@ import (
 	"context"
 	"flag"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/netip"
 	"os"
@@ -262,12 +262,11 @@ func Run(ctx context.Context, id []byte, port int) (<-chan dht.Event, error) {
 
 // nap is a long doze.
 func nap(n int, m int) {
-	time.Sleep(time.Duration(int64(n-m/2)*int64(time.Second) +
-		rand.Int63n(int64(m)*int64(time.Second))))
+	time.Sleep(time.Duration(n-m/2)*time.Second +
+		rand.N(time.Duration(m)*time.Second))
 }
 
 // doze is a short nap.
 func doze() {
-	time.Sleep(time.Millisecond +
-		time.Duration(rand.Intn(int(time.Millisecond))))
+	time.Sleep(time.Millisecond + rand.N(time.Millisecond))
 }

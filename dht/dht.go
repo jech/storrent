@@ -10,7 +10,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/netip"
 	"os"
@@ -335,8 +335,7 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 		if seconds > 0 {
 			s = time.Duration(seconds) * time.Second
 		}
-		return conn.SetDeadline(time.Now().Add(s +
-			time.Duration(rand.Int63n(int64(time.Second)))))
+		return conn.SetDeadline(time.Now().Add(s + rand.N(time.Second)))
 	}
 
 	for {

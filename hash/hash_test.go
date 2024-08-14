@@ -1,7 +1,7 @@
 package hash
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"testing"
 )
 

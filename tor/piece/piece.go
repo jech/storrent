@@ -7,7 +7,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"slices"
 	"sync"
 	"sync/atomic"

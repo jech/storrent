@@ -5,7 +5,7 @@ package httpclient
 import (
 	"context"
 	"errors"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -84,8 +84,7 @@ func Get(network, proxy string) *http.Client {
 
 func expire() {
 	for {
-		time.Sleep(time.Minute +
-			time.Duration(rand.Int63n(int64(time.Minute))))
+		time.Sleep(time.Minute + rand.N(time.Minute))
 		now := time.Now()
 		func() {
 			mu.Lock()

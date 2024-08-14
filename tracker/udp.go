@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/netip"
 	nurl "net/url"
@@ -112,7 +112,7 @@ func announceUDP(ctx context.Context, prot string,
 		return 0, err
 	}
 
-	tid := uint32(rand.Uint32())
+	tid := rand.Uint32()
 	err = binary.Write(w, binary.BigEndian, tid)
 	if err != nil {
 		return 0, err
@@ -138,7 +138,7 @@ func announceUDP(ctx context.Context, prot string,
 	if err != nil {
 		return 0, err
 	}
-	tid = uint32(rand.Uint32())
+	tid = rand.Uint32()
 	err = binary.Write(w, binary.BigEndian, tid)
 	if err != nil {
 		return 0, err
