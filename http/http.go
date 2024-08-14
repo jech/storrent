@@ -27,12 +27,27 @@ import (
 	"github.com/jech/storrent/tracker"
 )
 
-type handler struct {
-	ctx context.Context
+func Serve(addr string) error {
+	http.Handle("/", NewHandler())
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	server := &http.Server{Addr: addr}
+	go func(listener net.Listener) {
+		err := server.Serve(listener)
+		panic(err)
+	}(listener)
+
+	return nil
 }
 
-func NewHandler(ctx context.Context) http.Handler {
-	return &handler{ctx}
+type handler struct {
+}
+
+func NewHandler() http.Handler {
+	return &handler{}
 }
 
 func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +68,7 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	pth := r.URL.Path
 	if pth == "/" {
-		root(handler.ctx, w, r)
+		root(w, r)
 		return
 	}
 
@@ -125,7 +140,7 @@ func getTorrent(ctx context.Context, data string) (*tor.Torrent, error) {
 	return tor.GetTorrent(ctx, config.DefaultProxy(), data)
 }
 
-func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
+func root(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "HEAD" && r.Method != "GET" && r.Method != "POST" {
 		w.Header().Set("allow", "HEAD, GET, POST")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -177,7 +192,7 @@ func root(serverctx context.Context, w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		_, err = tor.AddTorrent(serverctx, t)
+		_, err = tor.AddTorrent(context.Background(), t)
 		if err != nil && err != os.ErrExist {
 			http.Error(w, err.Error(),
 				http.StatusInternalServerError)

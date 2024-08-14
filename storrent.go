@@ -12,7 +12,6 @@ import (
 	"log"
 	"math/rand/v2"
 	"net"
-	"net/http"
 	"net/netip"
 	"os"
 	"os/signal"
@@ -28,7 +27,7 @@ import (
 	"github.com/jech/storrent/crypto"
 	"github.com/jech/storrent/dht"
 	"github.com/jech/storrent/fuse"
-	thttp "github.com/jech/storrent/http"
+	"github.com/jech/storrent/http"
 	"github.com/jech/storrent/peer"
 	"github.com/jech/storrent/physmem"
 	"github.com/jech/storrent/rundht"
@@ -334,20 +333,12 @@ func main() {
 
 	go listen(listener)
 
-	http.Handle("/", thttp.NewHandler(ctx))
-	log.Printf("Listening on http://%v", config.HTTPAddr)
-	httpListener, err := net.Listen("tcp", config.HTTPAddr)
+	err = http.Serve(config.HTTPAddr)
 	if err != nil {
-		log.Printf("Listen (HTTP): %v", err)
+		log.Printf("Serve: %v", err)
 		return
 	}
-	defer httpListener.Close()
-
-	go func() {
-		server := &http.Server{Addr: config.HTTPAddr}
-		err := server.Serve(httpListener)
-		log.Printf("Serve HTTP: %v", err)
-	}()
+	log.Printf("Listening on http://%v", config.HTTPAddr)
 
 	go func() {
 		min := 250 * time.Millisecond
