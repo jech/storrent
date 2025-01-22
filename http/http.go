@@ -593,7 +593,8 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "<form action=\"/?q=add\" method=\"post\" enctype=\"multipart/form-data\">Magnet or URL: <input type=\"text\" name=\"url\"/><input type=\"file\" name=\"file\"><input type=\"submit\"/></form> ")
+	fmt.Fprintf(w, "<form style=\"display: inline;\" action=\"/?q=add\" method=\"post\" enctype=\"multipart/form-data\">Magnet or URL: <input type=\"text\" name=\"url\"/><input type=\"submit\"/></form>\n")
+	fmt.Fprintf(w, "<form style=\"display: inline; margin-left: 2em;\" action=\"/?q=add\" method=\"post\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"file\"><input type=\"submit\"/></form>\n")
 	fmt.Fprintf(w, "<form action=\"/?q=set\" method=\"post\">Idle download: <input type=\"text\" name=\"idle\"/> Upload: <input type=\"text\" name=\"upload\"/> <input type=\"submit\"/></form>\n")
 
 	fmt.Fprintf(w, "<p>Download %v / %v, upload %v / %v (unchoking %v), ",
