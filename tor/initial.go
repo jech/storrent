@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"time"
 
 	"golang.org/x/net/proxy"
 
@@ -94,7 +95,7 @@ func Server(conn net.Conn, cryptoOptions *crypto.Options) error {
 	return nil
 }
 
-// DialClient connects to a peer.
+// DialClient connects to a peer and runs the client loop.
 func DialClient(ctx context.Context, t *Torrent, addr netip.AddrPort, cryptoOptions *crypto.Options) error {
 	var conn net.Conn
 	var err error
@@ -116,6 +117,7 @@ again:
 
 	if t.proxy == "" {
 		var dialer net.Dialer
+		dialer.Timeout = 20 * time.Second
 		if config.MultipathTCP {
 			dialer.SetMultipathTCP(true)
 		}
@@ -135,7 +137,9 @@ again:
 		if !ok {
 			return errors.New("dialer is not ContextDialer")
 		}
-		conn, err = d.DialContext(ctx, "tcp", addr.String())
+		ctx2, cancel := context.WithTimeout(ctx, 20*time.Second)
+		conn, err = d.DialContext(ctx2, "tcp", addr.String())
+		cancel()
 	}
 	if err != nil {
 		return err
