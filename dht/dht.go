@@ -67,9 +67,8 @@ dht_blacklisted(const struct sockaddr *sa, int salen)
     return 0;
 }
 
-extern void dht_callback(void *closure, int event,
-                        const unsigned char *info_hash,
-                        const void *data, size_t data_len);
+extern void dht_callback(void *, int, const unsigned char *,
+                         const void *, size_t);
 
 static int
 periodic(const void *buf, int buflen,
