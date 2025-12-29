@@ -306,13 +306,12 @@ func Run(peer *Peer, torEvent chan<- TorEvent, torDone <-chan struct{},
 					}
 				}
 				var err error
-				peer.myBitmap.Range(func(i int) bool {
+				for i := range peer.myBitmap.AllSet() {
 					err = write(peer,
 						protocol.Have{uint32(i)})
-					return err == nil
-				})
-				if err != nil {
-					return err
+					if err != nil {
+						return err
+					}
 				}
 			} else {
 				bitmap := peer.myBitmap.Copy()
@@ -1275,13 +1274,12 @@ func unchoke(peer *Peer, unchoke bool) error {
 func maybeInterested(peer *Peer) error {
 	interested := false
 	if peer.shouldInterested && peer.Info != nil && peer.bitmap != nil {
-		peer.bitmap.Range(func(i int) bool {
+		for i := range peer.bitmap.AllSet() {
 			if !peer.myBitmap.Get(i) {
 				interested = true
-				return false
+				break
 			}
-			return true
-		})
+		}
 	}
 	if interested == peer.amInterested {
 		return nil

@@ -3,6 +3,7 @@
 package bitmap
 
 import (
+	"iter"
 	"math/bits"
 	"strings"
 )
@@ -169,19 +170,18 @@ func (b1 Bitmap) EqualValue(b2 Bitmap) bool {
 	return true
 }
 
-// Range applies a given function on all set values in a bitmap in
-// increasing order.  The iteration is interrupted when the function
-// returns false.
-func (b Bitmap) Range(f func(index int) bool) {
-	for i, v := range b {
-		if v == 0 {
-			continue
-		}
-		for j := uint8(0); j < 8; j++ {
-			if (v & (1 << (7 - j))) != 0 {
-				c := f((i << 3) + int(j))
-				if !c {
-					return
+func (b Bitmap) AllSet() iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for i, v := range b {
+			if v == 0 {
+				continue
+			}
+			for j := uint8(0); j < 8; j++ {
+				if (v & (1 << (7 - j))) != 0 {
+					c := yield((i << 3) + int(j))
+					if !c {
+						return
+					}
 				}
 			}
 		}

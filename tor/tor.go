@@ -459,10 +459,9 @@ func handleEvent(ctx context.Context, t *Torrent, c peer.TorEvent) error {
 		writePeers(t, peer.PeerMetadataComplete{t.Info}, nil)
 		periodicRequest(ctx, t)
 	case peer.TorPeerBitmap:
-		c.Bitmap.Range(func(i int) bool {
+		for i := range c.Bitmap.AllSet() {
 			noteAvailable(t, uint32(i), c.Have)
-			return true
-		})
+		}
 	case peer.TorPeerHave:
 		noteAvailable(t, c.Index, c.Have)
 	case peer.TorHave:

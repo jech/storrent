@@ -170,19 +170,18 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func TestRange(t *testing.T) {
+func TestAllSet(t *testing.T) {
 	var b Bitmap
 	for i := 0; i < 123; i++ {
 		b.Set(i * 3)
 	}
 	i := 0
-	b.Range(func(index int) bool {
+	for index := range b.AllSet() {
 		if index != i * 3 {
 			t.Errorf("Expected %v, got %v", i * 3, index)
 		}
 		i++
-		return true
-	})
+	}
 }
 
 const size = 0x1000
