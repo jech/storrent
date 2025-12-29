@@ -3,6 +3,7 @@ package tor
 import (
 	"bytes"
 	"github.com/jech/storrent/hash"
+	"iter"
 	"sync"
 )
 
@@ -24,14 +25,13 @@ func Get(hash hash.Hash) *Torrent {
 // multiple torrents have the same name.
 func GetByName(name string) *Torrent {
 	var torrent *Torrent
-	Range(func(h hash.Hash, t *Torrent) bool {
+	for _, t := range All() {
 		if t.Name == name {
 			if torrent == nil || bytes.Compare(t.Hash, torrent.Hash) < 0 {
 				torrent = t
 			}
 		}
-		return true
-	})
+	}
 	return torrent
 }
 
@@ -48,29 +48,29 @@ func del(hash hash.Hash) {
 	torrents.Delete(h)
 }
 
-func Range(f func(hash.Hash, *Torrent) bool) {
-	torrents.Range(func(k, v interface{}) bool {
-		a := k.([20]byte)
-		return f(a[:], v.(*Torrent))
-	})
+func All() iter.Seq2[[]byte, *Torrent] {
+	return func(yield func([]byte, *Torrent) bool) {
+		torrents.Range(func(k, v interface{}) bool {
+			a := k.([20]byte)
+			return yield(a[:], v.(*Torrent))
+		})
+	}
 }
 
 func count() int {
 	count := 0
-	Range(func(h hash.Hash, t *Torrent) bool {
+	for _, _ = range All() {
 		count++
-		return true
-	})
+	}
 	return count
 }
 
 func infoHashes(all bool) []hash.HashPair {
 	var pairs []hash.HashPair
-	Range(func(h hash.Hash, t *Torrent) bool {
+	for h, t := range All() {
 		if all || !t.hasProxy() {
 			pairs = append(pairs, hash.HashPair{h, t.MyId})
 		}
-		return true
-	})
+	}
 	return pairs
 }

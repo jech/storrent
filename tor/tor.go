@@ -1798,19 +1798,18 @@ func Expire() int {
 
 	bigcount := 0
 	var smallspace int64
-	Range(func(h hash.Hash, t *Torrent) bool {
+	for _, t := range All() {
 		bytes := t.Pieces.Bytes()
 		if bytes <= fair {
 			smallspace += bytes
 		} else {
 			bigcount++
 		}
-		return true
-	})
+	}
 
 	fair2 := (low - smallspace) / int64(bigcount)
 
-	Range(func(h hash.Hash, t *Torrent) bool {
+	for _, t := range All() {
 		if t.Pieces.Bytes() > fair2 {
 			available, err := t.GetAvailable()
 			if err != nil {
@@ -1821,8 +1820,7 @@ func Expire() int {
 					t.Have(index, false)
 				})
 		}
-		return true
-	})
+	}
 	return -1
 }
 

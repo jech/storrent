@@ -614,10 +614,9 @@ func torrents(w http.ResponseWriter, r *http.Request) {
 		approxBytes(alloc.Bytes()), approxBytes(config.MemoryHighMark()))
 
 	var tors []*tor.Torrent
-	tor.Range(func(k hash.Hash, t *tor.Torrent) bool {
+	for _, t := range tor.All() {
 		tors = append(tors, t)
-		return true
-	})
+	}
 	slices.SortFunc(tors, func(a, b *tor.Torrent) int {
 		if a.Name != b.Name {
 			return strings.Compare(a.Name, b.Name)

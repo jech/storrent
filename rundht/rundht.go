@@ -20,7 +20,6 @@ import (
 
 	"github.com/jech/storrent/config"
 	"github.com/jech/storrent/dht"
-	"github.com/jech/storrent/hash"
 	"github.com/jech/storrent/known"
 	"github.com/jech/storrent/pex"
 	"github.com/jech/storrent/tor"
@@ -151,11 +150,9 @@ func Bootstrap(ctx context.Context, nodes []netip.AddrPort) {
 			reannounced = reannounced6
 		}
 		if !reannounced {
-			tor.Range(
-				func(h hash.Hash, t *tor.Torrent) bool {
-					tor.Announce(h, ipv6)
-					return true
-				})
+			for h, _ := range tor.All() {
+				tor.Announce(h, ipv6)
+			}
 		}
 		if !ipv6 {
 			reannounced4 = true

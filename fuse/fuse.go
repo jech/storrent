@@ -96,7 +96,7 @@ func (dir root) Lookup(ctx context.Context, name string) (fs.Node, error) {
 
 func (dir root) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	ents := make([]fuse.Dirent, 0)
-	tor.Range(func(h hash.Hash, t *tor.Torrent) bool {
+	for _, t := range tor.All() {
 		if t.InfoComplete() && t.Name != "" {
 			tpe := fuse.DT_Dir
 			if t.Files == nil {
@@ -108,8 +108,7 @@ func (dir root) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 				Inode: fileInode(t.Hash, nil),
 			})
 		}
-		return true
-	})
+	}
 	return ents, nil
 }
 
