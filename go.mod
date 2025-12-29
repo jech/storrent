@@ -1,13 +1,13 @@
 module github.com/jech/storrent
 
-go 1.22
+go 1.24.0
 
 require (
 	bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5
 	github.com/jech/portmap v0.0.0-20240609101148-1151a9a8a46b
 	github.com/zeebo/bencode v1.0.0
-	golang.org/x/net v0.28.0
-	golang.org/x/sys v0.24.0
+	golang.org/x/net v0.48.0
+	golang.org/x/sys v0.39.0
 )
 
 require (
