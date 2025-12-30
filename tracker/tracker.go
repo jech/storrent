@@ -23,7 +23,7 @@ type base struct {
 	time     time.Time
 	interval time.Duration
 	err      error
-	locked   int32
+	locked   atomic.Bool
 }
 
 // Type Tracker represents a BitTorrent tracker.
@@ -60,11 +60,11 @@ func (tracker *base) URL() string {
 }
 
 func (tracker *base) tryLock() bool {
-	return atomic.CompareAndSwapInt32(&tracker.locked, 0, 1)
+	return tracker.locked.CompareAndSwap(false, true)
 }
 
 func (tracker *base) unlock() {
-	ok := atomic.CompareAndSwapInt32(&tracker.locked, 1, 0)
+	ok := tracker.locked.CompareAndSwap(true, false)
 	if !ok {
 		panic("unlocking unlocked torrent")
 	}
