@@ -104,8 +104,8 @@ func DialClient(ctx context.Context, t *Torrent, addr netip.AddrPort, cryptoOpti
 			cryptoOptions.AllowCryptoHandshake
 
 again:
-	if err := ctx.Err(); err != nil {
-		return err
+	if ctx.Err() != nil {
+		return context.Cause(ctx)
 	}
 
 	if !addr.Addr().IsGlobalUnicast() {
@@ -145,9 +145,9 @@ again:
 		return err
 	}
 
-	if err := ctx.Err(); err != nil {
+	if ctx.Err() != nil {
 		conn.Close()
-		return err
+		return context.Cause(ctx)
 	}
 
 	err = Client(conn, t, addr, t.proxy, cryptoHandshake, cryptoOptions)

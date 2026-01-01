@@ -393,8 +393,8 @@ func loop(ctx context.Context, ipv6 bool, myid []byte, port uint16) error {
 			}
 		}
 
-		if err = ctx.Err(); err != nil {
-			return err
+		if ctx.Err() != nil {
+			return context.Cause(ctx)
 		}
 
 		timeout(0)

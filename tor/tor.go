@@ -175,9 +175,9 @@ func (t *Torrent) run(ctx context.Context) {
 	}
 	ticker := time.NewTicker(5*time.Second + jiffy())
 	slowTicker := time.NewTicker(20*time.Second + jiffy())
-	ctx, cancelCtx := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancelCause(ctx)
 	defer func() {
-		cancelCtx()
+		cancelCtx(errors.New("torrent is shutting down"))
 		slowTicker.Stop()
 		t.setRequestInterval(0)
 		ticker.Stop()
@@ -1465,13 +1465,13 @@ func (t *Torrent) Kill(ctx context.Context) error {
 	case <-t.Done:
 		return ErrTorrentDead
 	case <-ctx.Done():
-		return ctx.Err()
+		return context.Cause(ctx)
 	case t.Event <- peer.TorGoAway{}:
 		select {
 		case <-t.Deleted:
 			return nil
 		case <-ctx.Done():
-			return ctx.Err()
+			return context.Cause(ctx)
 		}
 	}
 }

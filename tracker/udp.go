@@ -244,7 +244,7 @@ func udpRequestReply(ctx context.Context, conn net.Conn, request []byte,
 	timeout := 5 * time.Second
 	for i := 0; i < 4; i++ {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, context.Cause(ctx)
 		}
 
 		err = conn.SetDeadline(time.Now().Add(timeout))
@@ -258,7 +258,7 @@ func udpRequestReply(ctx context.Context, conn net.Conn, request []byte,
 		}
 
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, context.Cause(ctx)
 		}
 
 		buf := make([]byte, 4096)

@@ -161,10 +161,10 @@ func main() {
 		}(mountpoint)
 	}
 
-	ctx, cancelCtx := context.WithCancel(context.Background())
+	ctx, cancelCtx := context.WithCancelCause(context.Background())
 	portmapdone := make(chan struct{})
 	defer func(portmapdone <-chan struct{}) {
-		cancelCtx()
+		cancelCtx(errors.New("storrent is shutting down"))
 		log.Printf("Shutting down...")
 		timer := time.NewTimer(4 * time.Second)
 		select {
