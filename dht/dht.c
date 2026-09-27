@@ -1243,7 +1243,7 @@ search_step(struct search *sr, dht_callback_t *callback, void *closure)
         return;
     }
 
-    if(sr->step_time + DHT_SEARCH_RETRANSMIT >= now.tv_sec)
+    if(sr->step_time + DHT_SEARCH_RETRANSMIT > now.tv_sec)
         return;
 
     j = 0;
@@ -1843,7 +1843,7 @@ dht_init(int s, int s6, const unsigned char *id, const unsigned char *v)
 }
 
 int
-dht_uninit()
+dht_uninit(void)
 {
     if(dht_socket < 0 && dht_socket6 < 0) {
         errno = EINVAL;
@@ -2318,17 +2318,19 @@ dht_periodic(const void *buf, size_t buflen,
     }
 
     if(now.tv_sec >= confirm_nodes_time) {
-        int soon = 0;
+        int soon, soon4, soon6;
 
-        soon |= bucket_maintenance(AF_INET);
-        soon |= bucket_maintenance(AF_INET6);
+        /* We distinguish IPv4 and IPv6, so that an empty IPv6 bucket does
+           not starve IPv4 neighborhood maintenance. */
+        soon4 = bucket_maintenance(AF_INET);
+        soon6 = bucket_maintenance(AF_INET6);
 
-        if(!soon) {
-            if(mybucket_grow_time >= now.tv_sec - 150)
-                soon |= neighbourhood_maintenance(AF_INET);
-            if(mybucket6_grow_time >= now.tv_sec - 150)
-                soon |= neighbourhood_maintenance(AF_INET6);
-        }
+        if(!soon4 && mybucket_grow_time >= now.tv_sec - 150)
+            soon4 |= neighbourhood_maintenance(AF_INET);
+        if(!soon6 && mybucket6_grow_time >= now.tv_sec - 150)
+            soon6 |= neighbourhood_maintenance(AF_INET6);
+
+        soon = soon4 | soon6;
 
         /* Given the timeouts in bucket_maintenance, with a 22-bucket
            table, worst case is a ping every 18 seconds (22 buckets plus
