@@ -46,17 +46,14 @@ func (tracker *UDP) Announce(ctx context.Context, hash []byte, myid []byte,
 	var i4, i6 time.Duration
 	var e4, e6 error
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
+	wg.Go(func() {
 		i4, e4 = announceUDP(ctx, "udp4", f,
 			url, hash, myid, want, size, port4, proxy)
-		wg.Done()
-	}()
-	go func() {
+	})
+	wg.Go(func() {
 		i6, e6 = announceUDP(ctx, "udp6", f,
 			url, hash, myid, want, size, port6, proxy)
-		wg.Done()
-	}()
+	})
 	wg.Wait()
 	if e4 != nil && e6 != nil {
 		err = e4

@@ -67,21 +67,18 @@ func (tracker *HTTP) Announce(ctx context.Context, hash []byte, myid []byte,
 		var i4, i6 int
 		var e4, e6 error
 		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
+		wg.Go(func() {
 			i4, e4 = announceHTTP(
 				ctx, "tcp4", tracker, hash, myid,
 				want, size, port4, proxy, f,
 			)
-			wg.Done()
-		}()
-		go func() {
+		})
+		wg.Go(func() {
 			i6, e6 = announceHTTP(
 				ctx, "tcp6", tracker, hash, myid,
 				want, size, port6, proxy, f,
 			)
-			wg.Done()
-		}()
+		})
 		wg.Wait()
 		if e4 != nil && e6 != nil {
 			err = e4
