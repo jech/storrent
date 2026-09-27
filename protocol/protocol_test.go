@@ -12,7 +12,6 @@ import (
 	"net/netip"
 	"os"
 	"reflect"
-	"sync"
 	"testing"
 
 	"github.com/jech/storrent/crypto"
@@ -33,10 +32,9 @@ func testHandshake(t *testing.T, chand bool, opts *crypto.Options) {
 	hashes := []hash.HashPair{hash.HashPair{h, sid}}
 	c, s := net.Pipe()
 	var ss net.Conn
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan struct{})
 	go func() {
-		defer wg.Done()
+		defer close(done)
 		var err error
 		ss, _, _, err = ServerHandshake(s, hashes, opts)
 		if err != nil {
@@ -51,7 +49,7 @@ func testHandshake(t *testing.T, chand bool, opts *crypto.Options) {
 		t.Fatalf("ClientHandshake: %v", err)
 	}
 	defer cc.Close()
-	wg.Wait()
+	<-done
 }
 
 func TestHandshake(t *testing.T) {
@@ -141,10 +139,9 @@ func TestWriter(t *testing.T) {
 			p1, p2 := net.Pipe()
 			w := bufio.NewWriter(p1)
 			b := make([]byte, 32*1024)
-			var wg sync.WaitGroup
-			wg.Add(1)
+			done := make(chan struct{})
 			go func() {
-				defer wg.Done()
+				defer close(done)
 				n := 0
 				for n < len(b) {
 					m, _ := p2.Read(b[n:])
@@ -165,7 +162,7 @@ func TestWriter(t *testing.T) {
 				t.Error(err)
 			}
 			p1.Close()
-			wg.Wait()
+			<-done
 			if m.v != "" {
 				if string(b) != m.v {
 					t.Errorf("Got %#v, expected %#v",

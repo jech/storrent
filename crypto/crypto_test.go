@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"net"
-	"sync"
 	"testing"
 	"time"
 )
@@ -44,11 +43,10 @@ func testHandshake(t *testing.T, options *Options) {
 		serverData[i] = byte(42 - i)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan struct{})
 
 	go func() {
-		defer wg.Done()
+		defer close(done)
 		client.SetDeadline(time.Now().Add(5 * time.Second))
 		eclient, buf, err :=
 			ClientHandshake(client, clientSkey, clientIa, options)
@@ -114,7 +112,7 @@ func testHandshake(t *testing.T, options *Options) {
 	if err != nil {
 		t.Fatalf("Server close: %v", err)
 	}
-	wg.Wait()
+	<-done
 }
 
 func TestHandshake(t *testing.T) {
@@ -127,11 +125,9 @@ func BenchmarkPipe(b *testing.B) {
 	data := make([]byte, 4096)
 	b.SetBytes(int64(len(data)))
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
+	done := make(chan struct{})
 	go func(count int) {
-		defer wg.Done()
+		defer close(done)
 		defer client.Close()
 		for i := 0; i < count; i++ {
 			_, err := client.Write(data)
@@ -156,7 +152,7 @@ func BenchmarkPipe(b *testing.B) {
 			b.Fatalf("Server Read: %v", err)
 		}
 	}
-	wg.Wait()
+	<-done
 }
 
 func BenchmarkHandshake(b *testing.B) {
@@ -203,11 +199,9 @@ func BenchmarkClient(b *testing.B) {
 	data := make([]byte, 4096)
 	b.SetBytes(int64(len(data)))
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
+	done := make(chan struct{})
 	go func(count int) {
-		defer wg.Done()
+		defer close(done)
 		client.SetDeadline(time.Now().Add(5 * time.Second))
 		eclient, buf, err :=
 			ClientHandshake(client, skey, []byte{}, options1)
@@ -246,7 +240,7 @@ func BenchmarkClient(b *testing.B) {
 			b.Fatalf("Server Read: %v", err)
 		}
 	}
-	wg.Wait()
+	<-done
 }
 
 func BenchmarkServer(b *testing.B) {
@@ -255,11 +249,9 @@ func BenchmarkServer(b *testing.B) {
 	data := make([]byte, 4096)
 	b.SetBytes(int64(len(data)))
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
+	done := make(chan struct{})
 	go func(count int) {
-		defer wg.Done()
+		defer close(done)
 		client.SetDeadline(time.Now().Add(5 * time.Second))
 		eclient, buf1, err :=
 			ClientHandshake(client, skey, []byte{}, options1)
@@ -298,5 +290,5 @@ func BenchmarkServer(b *testing.B) {
 			b.Fatalf("Server Write: %v", err)
 		}
 	}
-	wg.Wait()
+	<-done
 }
