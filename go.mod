@@ -1,6 +1,6 @@
 module github.com/jech/storrent
 
-go 1.24.0
+go 1.25.0
 
 require (
 	bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5
