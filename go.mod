@@ -6,8 +6,8 @@ require (
 	bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5
 	github.com/jech/portmap v0.0.0-20240609101148-1151a9a8a46b
 	github.com/zeebo/bencode v1.0.0
-	golang.org/x/net v0.48.0
-	golang.org/x/sys v0.39.0
+	golang.org/x/net v0.58.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
