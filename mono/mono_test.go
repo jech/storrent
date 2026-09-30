@@ -2,6 +2,7 @@ package mono
 
 import (
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -35,10 +36,13 @@ func TestSub(t *testing.T) {
 }
 
 func TestNow(t *testing.T) {
-	t1 := Now()
-	time.Sleep(3 * time.Second / 2)
-	if v := Since(t1); v != 1 {
-		t.Errorf("Expected 1, got %v", v)
-	}
+	synctest.Test(t, func (t *testing.T) {
+		reset()
+		t1 := Now()
+		time.Sleep(3 * time.Second / 2)
+		if v := Since(t1); v != 1 {
+			t.Errorf("Expected 1, got %v", v)
+		}
+	})
 }
 

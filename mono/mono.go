@@ -8,8 +8,13 @@ import (
 
 var origin time.Time
 
-func init() {
+// reset is is for testing
+func reset() {
 	origin = time.Now().Add(-time.Second)
+}
+
+func init() {
+	reset()
 }
 
 // Time represtents a monotonic time with second granularity.
